@@ -1,0 +1,40 @@
+{
+  "name": "claude-auto-tee",
+  "version": "1.0.0",
+  "description": "Automatic tee injection for Claude Code bash commands - save full output while seeing truncated results",
+  "main": "src/hook.js",
+  "bin": {
+    "claude-auto-tee": "./install.js"
+  },
+  "scripts": {
+    "install": "node install.js", 
+    "test": "node test/test.js",
+    "demo": "node test/demo.js",
+    "demo:realistic": "node test/realistic-demo.js",
+    "docker:test": "docker-compose run --rm claude-auto-tee-test",
+    "docker:demo": "docker-compose run --rm claude-auto-tee-demo", 
+    "docker:dev": "docker-compose run --rm claude-auto-tee-dev"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "bash",
+    "tee",
+    "hook",
+    "automation"
+  ],
+  "author": "flyingrobots",
+  "license": "MIT",
+  "dependencies": {
+    "bash-parser": "^0.5.0",
+    "uuid": "^11.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/flyingrobots/claude-auto-tee.git"
+  },
+  "bugs": {
+    "url": "https://github.com/flyingrobots/claude-auto-tee/issues"
+  },
+  "homepage": "https://github.com/flyingrobots/claude-auto-tee#readme"
+}

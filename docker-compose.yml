@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  claude-auto-tee-test:
+    build: .
+    volumes:
+      - ./test-results:/tmp/test-results
+    environment:
+      - NODE_ENV=test
+    command: npm test
+
+  claude-auto-tee-demo:
+    build: .
+    volumes:
+      - ./test-results:/tmp/test-results
+    environment:
+      - NODE_ENV=demo
+    command: node test/demo.js
+    
+  claude-auto-tee-dev:
+    build: .
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    command: bash
+    stdin_open: true
+    tty: true
