@@ -139,4 +139,4 @@ Temporary Items
 .apdisk
 
 # Obsidian
-.obsidian/
+.obsidian//target/

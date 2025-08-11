@@ -1,0 +1,308 @@
+name: Comprehensive Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  # Basic tests on multiple platforms and Node versions
+  basic-tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [16, 18, 20]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run basic tests
+      run: npm test
+    
+    - name: Run activation strategy tests
+      run: npm run test:activation
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: basic-test-results-${{ matrix.os }}-node${{ matrix.node-version }}
+        path: /tmp/test-results/
+        retention-days: 7
+
+  # Performance benchmarks
+  performance-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run performance benchmarks
+      run: npm run test:performance
+    
+    - name: Upload performance results
+      uses: actions/upload-artifact@v4
+      with:
+        name: performance-test-results
+        path: /tmp/test-results/
+        retention-days: 30
+
+  # Security testing
+  security-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run security tests
+      run: npm run test:security
+    
+    - name: Upload security results
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-test-results
+        path: /tmp/test-results/
+        retention-days: 30
+
+  # Edge case testing
+  edge-case-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run edge case tests
+      run: npm run test:edge-cases
+    
+    - name: Upload edge case results
+      uses: actions/upload-artifact@v4
+      with:
+        name: edge-case-test-results
+        path: /tmp/test-results/
+        retention-days: 7
+
+  # CI/CD environment testing
+  ci-environment-tests:
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+      GITHUB_ACTIONS: true
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run CI environment tests
+      run: npm run test:ci
+    
+    - name: Upload CI test results
+      uses: actions/upload-artifact@v4
+      with:
+        name: ci-test-results
+        path: /tmp/test-results/
+        retention-days: 7
+
+  # Docker-based cross-platform testing
+  docker-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Build test environment
+      run: docker build -t claude-auto-tee-test -f test/environments/Dockerfile.cross-platform .
+    
+    - name: Run comprehensive tests in Alpine
+      run: docker run --rm -v /tmp/ci-results:/tmp/test-results claude-auto-tee-test npm run test:all
+    
+    - name: Run cross-platform tests
+      run: docker-compose -f test/environments/docker-compose.test.yml up --abort-on-container-exit
+    
+    - name: Upload Docker test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: docker-test-results
+        path: /tmp/ci-results/
+        retention-days: 7
+
+  # Master test runner with comprehensive analysis
+  comprehensive-analysis:
+    runs-on: ubuntu-latest
+    needs: [basic-tests, performance-tests, security-tests, edge-case-tests, ci-environment-tests]
+    if: always()
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run comprehensive test analysis
+      run: npm run test:all
+      continue-on-error: true
+    
+    - name: Generate test report
+      if: always()
+      run: |
+        echo "# Claude Auto-Tee Test Results" > test-summary.md
+        echo "" >> test-summary.md
+        echo "## Test Execution Summary" >> test-summary.md
+        echo "- Date: $(date)" >> test-summary.md
+        echo "- Commit: ${{ github.sha }}" >> test-summary.md
+        echo "- Platform: ubuntu-latest (CI)" >> test-summary.md
+        echo "" >> test-summary.md
+        
+        if [ -f /tmp/test-results/test-summary.md ]; then
+          cat /tmp/test-results/test-summary.md >> test-summary.md
+        else
+          echo "⚠️ Test summary not generated - see artifacts for details" >> test-summary.md
+        fi
+    
+    - name: Upload comprehensive results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: comprehensive-test-results
+        path: |
+          /tmp/test-results/
+          test-summary.md
+        retention-days: 30
+    
+    - name: Comment on PR with results
+      if: github.event_name == 'pull_request' && always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          let summary = 'Test execution completed. See artifacts for detailed results.';
+          
+          try {
+            if (fs.existsSync('test-summary.md')) {
+              summary = fs.readFileSync('test-summary.md', 'utf8');
+            }
+          } catch (error) {
+            console.error('Failed to read test summary:', error);
+          }
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `## 🧪 Test Results\n\n${summary}`
+          });
+
+  # Validate expert recommendations
+  expert-validation:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Validate implementation matches expert recommendation
+      run: |
+        echo "🔍 Checking implementation vs expert recommendation..."
+        
+        # Check if current implementation uses hybrid strategy
+        if grep -q "expensivePatterns" src/hook.js; then
+          echo "⚠️ FOUND: Current implementation uses hybrid strategy (pattern matching)"
+          USES_HYBRID=true
+        else
+          echo "✅ Current implementation appears to use pipe-only strategy"
+          USES_HYBRID=false
+        fi
+        
+        # Check expert recommendation from debate conclusion
+        if grep -q "Pure Pipe-Only Detection" docs/debates/activation-strategy/conclusion.md; then
+          echo "📋 Expert recommendation: Pure Pipe-Only Detection"
+          EXPERT_RECOMMENDS_PIPE_ONLY=true
+        else
+          echo "❓ Expert recommendation unclear"
+          EXPERT_RECOMMENDS_PIPE_ONLY=false
+        fi
+        
+        # Compare and report
+        if [ "$USES_HYBRID" = true ] && [ "$EXPERT_RECOMMENDS_PIPE_ONLY" = true ]; then
+          echo "❌ CRITICAL: Implementation contradicts expert recommendation!"
+          echo "   Current: Hybrid (pattern + pipe)"
+          echo "   Expert Consensus: Pure pipe-only"
+          echo "   Action Required: Align implementation with expert decision"
+          exit 1
+        else
+          echo "✅ Implementation aligns with expert recommendation"
+        fi
+    
+    - name: Run activation strategy validation
+      run: npm run test:activation
+
+# Security scanning
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run npm audit
+      run: npm audit --audit-level moderate
+    
+    - name: Run security tests
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18
+        cache: 'npm'
+    
+    - run: npm ci
+    - run: npm run test:security

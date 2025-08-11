@@ -1,0 +1,66 @@
+[package]
+name = "claude-auto-tee"
+version = "1.0.0"
+edition = "2021"
+description = "Automatic tee injection for Claude Code bash commands - save full output while seeing truncated results"
+authors = ["flyingrobots"]
+license = "MIT"
+repository = "https://github.com/flyingrobots/claude-auto-tee.git"
+readme = "README.md"
+keywords = ["claude", "bash", "tee", "hook", "automation"]
+categories = ["command-line-utilities", "development-tools"]
+
+[lib]
+name = "claude_auto_tee"
+path = "src/lib.rs"
+
+[[bin]]
+name = "claude-auto-tee"
+path = "src/main.rs"
+
+[[bin]]
+name = "benchmark"
+path = "src/bin/benchmark.rs"
+
+[dependencies]
+# JSON handling - minimal, fast serde
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# UUID generation - minimal dependency alternative to Node.js uuid
+uuid = { version = "1.0", features = ["v4"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0"
+
+# Regex for pattern matching (compiled once, used many times)
+regex = "1.0"
+
+[dev-dependencies]
+# Test utilities
+tempfile = "3.0"
+assert_cmd = "2.0"
+predicates = "3.0"
+
+[profile.release]
+# Performance optimization as required by expert debate
+opt-level = 3
+debug = false
+strip = true
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.dev]
+# Fast compilation for development
+opt-level = 0
+debug = true
+overflow-checks = true
+
+# Platform-specific optimizations
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["processenv"] }

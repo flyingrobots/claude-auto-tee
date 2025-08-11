@@ -9,9 +9,17 @@
   "scripts": {
     "install": "node install.js", 
     "test": "node test/test.js",
+    "test:all": "node test/run-all-tests.js",
+    "test:performance": "node test/performance/benchmark.js",
+    "test:security": "node test/security/security-tests.js",
+    "test:edge-cases": "node test/edge-cases/edge-case-tests.js",
+    "test:activation": "node test/activation/activation-strategy-tests.js",
+    "test:ci": "node test/ci/ci-tests.js",
     "demo": "node test/demo.js",
     "demo:realistic": "node test/realistic-demo.js",
     "docker:test": "docker-compose run --rm claude-auto-tee-test",
+    "docker:test:all": "docker-compose -f test/environments/docker-compose.test.yml run --rm alpine-test npm run test:all",
+    "docker:test:cross-platform": "docker-compose -f test/environments/docker-compose.test.yml up --abort-on-container-exit",
     "docker:demo": "docker-compose run --rm claude-auto-tee-demo", 
     "docker:dev": "docker-compose run --rm claude-auto-tee-dev"
   },
