@@ -141,3 +141,4 @@ Temporary Items
 # Obsidian
 .obsidian//target/
 .obsidian/
+/target/
