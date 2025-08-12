@@ -216,6 +216,38 @@ ls -la /tmp/claude-*.log
 CLAUDE_AUTO_TEE_DEBUG=1 ./src/claude-auto-tee.sh
 ```
 
+## Configuration
+
+Claude Auto-Tee supports environment variable overrides for advanced customization:
+
+### Environment Variables
+
+| Variable | Purpose | Default | Example |
+|----------|---------|---------|---------|
+| `CLAUDE_AUTO_TEE_VERBOSE` | Enable detailed logging | `false` | `export CLAUDE_AUTO_TEE_VERBOSE=true` |
+| `CLAUDE_AUTO_TEE_TEMP_DIR` | Override temp directory | Auto-detected | `export CLAUDE_AUTO_TEE_TEMP_DIR=/custom/temp` |
+| `CLAUDE_AUTO_TEE_CLEANUP_ON_SUCCESS` | Auto-cleanup temp files | `true` | `export CLAUDE_AUTO_TEE_CLEANUP_ON_SUCCESS=false` |
+| `CLAUDE_AUTO_TEE_TEMP_PREFIX` | Customize temp file prefix | `claude` | `export CLAUDE_AUTO_TEE_TEMP_PREFIX=debug` |
+| `CLAUDE_AUTO_TEE_MAX_SIZE` | Size limit hint (bytes) | None | `export CLAUDE_AUTO_TEE_MAX_SIZE=104857600` |
+
+### Usage Examples
+
+```bash
+# Enable verbose logging for debugging
+export CLAUDE_AUTO_TEE_VERBOSE=true
+
+# Preserve all temp files for analysis  
+export CLAUDE_AUTO_TEE_CLEANUP_ON_SUCCESS=false
+
+# Use custom temp directory
+export CLAUDE_AUTO_TEE_TEMP_DIR=/mnt/fast-storage/temp
+
+# Custom prefix for easier identification
+export CLAUDE_AUTO_TEE_TEMP_PREFIX=project
+```
+
+See [docs/ENVIRONMENT-VARIABLES.md](docs/ENVIRONMENT-VARIABLES.md) for detailed documentation.
+
 **Uninstall:**
 ```bash
 # Remove global configuration

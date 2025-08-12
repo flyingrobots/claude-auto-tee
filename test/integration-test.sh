@@ -152,13 +152,12 @@ validate_temp_path() {
     local output="$1"
     if validate_json_structure "$output"; then
         # Extract the temp file path and validate it looks correct
-        local temp_path
-        temp_path=$(echo "$output" | grep -o '/tmp/claude-[^"]*\.log' || echo "")
-        if [[ -n "$temp_path" && "$temp_path" =~ ^/tmp/claude-[0-9]+\.log$ ]]; then
+        # Look for claude- pattern followed by timestamp and .log extension
+        if echo "$output" | grep -q "claude-[0-9][^\"]*\.log"; then
             return 0
         fi
         
-        # Windows/alternative temp directory patterns
+        # Fallback: just check for claude- pattern anywhere in the output
         if echo "$output" | grep -q "claude-.*\.log"; then
             return 0
         fi
@@ -173,8 +172,13 @@ platform_test() {
     local output="$1"
     if validate_json_structure "$output"; then
         case "$(uname -s 2>/dev/null || echo Unknown)" in
-            "Darwin"|"Linux")
-                echo "$output" | grep -q "/tmp/claude-" && return 0
+            "Darwin")
+                # macOS uses /private/var/tmp, /tmp, or TMPDIR (typically /var/folders/...)
+                echo "$output" | grep -q "claude-.*\.log" && return 0
+                ;;
+            "Linux")
+                # Linux uses /var/tmp, /tmp, or TMPDIR
+                echo "$output" | grep -q "claude-.*\.log" && return 0
                 ;;
             *)
                 # Windows or other - just check for claude- pattern

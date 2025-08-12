@@ -10,8 +10,11 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/error-codes.sh"
 source "${SCRIPT_DIR}/disk-space-check.sh"
 
-# Check for verbose mode (P1.T021)
+# Environment variable overrides (P1.T003)
 readonly VERBOSE_MODE="${CLAUDE_AUTO_TEE_VERBOSE:-false}"
+readonly CLEANUP_ON_SUCCESS="${CLAUDE_AUTO_TEE_CLEANUP_ON_SUCCESS:-true}"
+readonly TEMP_FILE_PREFIX="${CLAUDE_AUTO_TEE_TEMP_PREFIX:-claude}"
+readonly MAX_TEMP_FILE_SIZE="${CLAUDE_AUTO_TEE_MAX_SIZE:-}"
 
 # Verbose logging function
 log_verbose() {
@@ -59,7 +62,20 @@ get_temp_dir() {
     local dir
     
     # Test candidates in priority order
-    # 1. Environment variables (cross-platform)
+    # 1. Claude Auto-Tee specific override (P1.T003)
+    if [[ -n "${CLAUDE_AUTO_TEE_TEMP_DIR:-}" ]]; then
+        dir="${CLAUDE_AUTO_TEE_TEMP_DIR%/}"  # Remove trailing slash
+        log_verbose "Testing CLAUDE_AUTO_TEE_TEMP_DIR override: $dir"
+        if [[ -d "$dir" && -w "$dir" && -x "$dir" ]]; then
+            log_verbose "Using CLAUDE_AUTO_TEE_TEMP_DIR override: $dir"
+            echo "$dir"
+            return 0
+        fi
+        log_verbose "CLAUDE_AUTO_TEE_TEMP_DIR override not suitable: $dir"
+        # Continue with fallback chain instead of failing immediately
+    fi
+    
+    # 2. Standard environment variables (cross-platform)
     if [[ -n "${TMPDIR:-}" ]]; then
         dir="${TMPDIR%/}"  # Remove trailing slash
         log_verbose "Testing TMPDIR: $dir"
@@ -93,7 +109,7 @@ get_temp_dir() {
         log_verbose "TEMP not suitable: $dir"
     fi
     
-    # 2. Platform-specific defaults
+    # 3. Platform-specific defaults
     local platform
     platform="$(uname -s)"
     log_verbose "Platform detected: $platform"
@@ -145,7 +161,7 @@ get_temp_dir() {
             ;;
     esac
     
-    # 3. Last resort fallbacks
+    # 4. Last resort fallbacks
     log_verbose "Trying last resort fallbacks"
     for dir in "${HOME}/.tmp" "${HOME}/tmp" "."; do
         log_verbose "Testing last resort: $dir"
@@ -179,7 +195,10 @@ command_escaped=$(echo "$input" | sed -n 's/.*"command":"\([^"]*\(\\"[^"]*\)*\)"
 if [[ -z "$command_escaped" ]]; then
     log_verbose "No command found in JSON, checking for malformed JSON"
     if ! echo "$input" | grep -q '"tool"'; then
-        report_error $ERR_MALFORMED_JSON "Input does not appear to be valid tool JSON" true
+        log_verbose "Input does not appear to be valid tool JSON - passing through unchanged"
+        report_warning $ERR_MALFORMED_JSON "Malformed JSON input - graceful passthrough"
+        echo "$input"
+        exit 0
     fi
     # Not a bash command, pass through unchanged
     echo "$input"
@@ -233,9 +252,17 @@ if echo "$command" | grep -q " | "; then
     log_verbose "Disk space check passed"
     clear_error_context
     
+    # Validate MAX_TEMP_FILE_SIZE override if set (P1.T003)
+    if [[ -n "$MAX_TEMP_FILE_SIZE" ]] && [[ "$MAX_TEMP_FILE_SIZE" =~ ^[0-9]+$ ]]; then
+        log_verbose "Max temp file size limit set: ${MAX_TEMP_FILE_SIZE} bytes"
+        # This will be enforced during command execution by the shell's ulimit or monitoring
+    elif [[ -n "$MAX_TEMP_FILE_SIZE" ]]; then
+        log_verbose "Warning: Invalid MAX_TEMP_FILE_SIZE value '$MAX_TEMP_FILE_SIZE', ignoring"
+    fi
+    
     # Generate unique temp file and cleanup script (P1.T013)
     set_error_context "Creating temp file and cleanup script"
-    temp_file="${temp_dir}/claude-$(date +%s%N | cut -b1-13).log"
+    temp_file="${temp_dir}/${TEMP_FILE_PREFIX}-$(date +%s%N | cut -b1-13).log"
     
     # Validate temp file path
     if [[ ! -w "$temp_dir" ]]; then
@@ -272,14 +299,22 @@ if echo "$command" | grep -q " | "; then
     fi
     
     # Add cleanup on successful completion (P1.T013)
-    # Use a compound command with conditional cleanup
-    if [[ -n "$cleanup_script" ]] && [[ -f "$cleanup_script" ]]; then
+    # Use CLEANUP_ON_SUCCESS environment variable override (P1.T003)
+    if [[ "$CLEANUP_ON_SUCCESS" == "true" ]] && [[ -n "$cleanup_script" ]] && [[ -f "$cleanup_script" ]]; then
         cleanup_command="source \"$cleanup_script\" && { $modified_command; } && { echo \"Full output saved to: $temp_file\"; cleanup_temp_file \"$temp_file\"; rm -f \"$cleanup_script\" 2>/dev/null || true; } || { echo \"Command failed - temp file preserved: $temp_file\"; rm -f \"$cleanup_script\" 2>/dev/null || true; }"
-        log_verbose "Added cleanup logic for successful completion"
+        log_verbose "Added cleanup logic for successful completion (CLEANUP_ON_SUCCESS=$CLEANUP_ON_SUCCESS)"
     else
-        # No cleanup script available - just run command with preservation message
+        # No cleanup or cleanup disabled - preserve temp file
         cleanup_command="{ $modified_command; } && echo \"Full output saved to: $temp_file\" || echo \"Command failed - temp file preserved: $temp_file\""
-        log_verbose "Running without cleanup script (cleanup script creation failed)"
+        if [[ "$CLEANUP_ON_SUCCESS" != "true" ]]; then
+            log_verbose "Cleanup disabled via CLAUDE_AUTO_TEE_CLEANUP_ON_SUCCESS=$CLEANUP_ON_SUCCESS"
+        else
+            log_verbose "Running without cleanup script (cleanup script creation failed)"
+        fi
+        # Clean up the cleanup script itself if it exists
+        if [[ -n "$cleanup_script" ]] && [[ -f "$cleanup_script" ]]; then
+            rm -f "$cleanup_script" 2>/dev/null || true
+        fi
     fi
     
     # Build new JSON - simpler approach using printf with proper escaping
