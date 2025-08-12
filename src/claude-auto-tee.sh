@@ -9,8 +9,8 @@ input=$(cat)
 command_escaped=$(echo "$input" | sed -n 's/.*"command":"\([^"]*\(\\"[^"]*\)*\)".*/\1/p' | tr -d '\n')
 command=$(echo "$command_escaped" | sed 's/\\"/"/g')
 
-# Check if command contains pipe and doesn't already have tee
-if echo "$command" | grep -c " | " > /dev/null && [ $(echo "$command" | grep -c " | ") -gt 0 ]; then
+# Check if command contains pipe and doesn't already have tee  
+if echo "$command" | grep -q " | "; then
     if echo "$command" | grep -q "tee "; then
         # Skip - already has tee
         echo "$input"
