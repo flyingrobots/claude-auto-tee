@@ -103,7 +103,7 @@ The longest dependency chain is **8 levels deep**:
 #### Day 4 Morning (4 hours)
 
 **Resource Management Dependencies**
-- [ ] [P1.T018](https://github.com/flyingrobots/claude-auto-tee/issues/20) - Implement size limits for temp files (2h)
+- [x] [P1.T018](https://github.com/flyingrobots/claude-auto-tee/issues/20) - Implement size limits for temp files (2h)
   - *Depends on: P1.T017*
 - [ ] [P1.T014](https://github.com/flyingrobots/claude-auto-tee/issues/6) - Add cleanup on script interruption (2h)
   - *Depends on: P1.T013*
@@ -111,9 +111,9 @@ The longest dependency chain is **8 levels deep**:
 #### Day 4 Afternoon (4 hours)
 
 **Error Framework Dependencies**
-- [ ] [P1.T025](https://github.com/flyingrobots/claude-auto-tee/issues/26) - Implement structured error messages (1.5h)
+- [x] [P1.T025](https://github.com/flyingrobots/claude-auto-tee/issues/26) - Implement structured error messages (1.5h)
   - *Depends on: P1.T024*
-- [ ] [P1.T026](https://github.com/flyingrobots/claude-auto-tee/issues/27) - Add debug/verbose mode for troubleshooting (2.5h)
+- [x] [P1.T026](https://github.com/flyingrobots/claude-auto-tee/issues/27) - Add debug/verbose mode for troubleshooting (2.5h)
   - *Depends on: P1.T024*
 
 ### Days 5-7: Extended Implementation Phase
