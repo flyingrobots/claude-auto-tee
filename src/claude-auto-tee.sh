@@ -452,14 +452,33 @@ if echo "$command" | grep -q " | "; then
     clear_error_context
     log_verbose "Selected temp directory: $temp_dir"
     
-    # Check disk space before proceeding (P1.T017)
+    # Check disk space before proceeding (P1.T017, P1.T019)
     set_error_context "Checking disk space for command execution"
     log_verbose "Checking disk space for command execution..."
-    if ! check_temp_space_for_command "$temp_dir" "$command" "$VERBOSE_MODE"; then
+    
+    # Use enhanced space checking with meaningful error messages (P1.T019)
+    space_check_result=""
+    if ! check_space_with_detailed_errors "$temp_dir" "$command" "$VERBOSE_MODE"; then
+        space_check_result=$?
         clear_error_context
-        log_verbose "Insufficient disk space - passing through unchanged"
-        # Graceful degradation: pass through unchanged to avoid failures
-        report_warning $ERR_INSUFFICIENT_SPACE "Falling back to pass-through mode due to insufficient space"
+        log_verbose "Space check failed with code $space_check_result - enabling graceful degradation"
+        
+        # Different handling based on space error severity
+        case $space_check_result in
+            21) # ERR_DISK_FULL - critical, must fallback
+                report_warning $ERR_DISK_FULL "Critical disk space issue - falling back to pass-through mode"
+                ;;
+            22) # ERR_QUOTA_EXCEEDED - user issue, fallback recommended
+                report_warning $ERR_QUOTA_EXCEEDED "Quota exceeded - falling back to pass-through mode"
+                ;;
+            20) # ERR_INSUFFICIENT_SPACE - warning, but can try to continue
+                report_warning $ERR_INSUFFICIENT_SPACE "Limited disk space - falling back to pass-through mode"
+                ;;
+            *) # Other space-related issues
+                report_warning $ERR_SPACE_CHECK_FAILED "Space check failed - falling back to pass-through mode"
+                ;;
+        esac
+        
         echo "$input"
         exit 0
     fi
