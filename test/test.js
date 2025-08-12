@@ -195,7 +195,7 @@ async function testPipeOnlyDetection() {
     { command: 'npm run build | head -10', shouldActivate: true },
     { command: 'ls -la | grep test', shouldActivate: true },
     { command: 'ls -la | wc -l', shouldActivate: true },
-    { command: 'echo "test" | cat', shouldActivate: true },
+    { command: 'echo test | cat', shouldActivate: true },
     
     // Should NOT activate (no pipes)
     { command: 'npm run build', shouldActivate: false },
