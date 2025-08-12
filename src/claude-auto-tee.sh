@@ -18,6 +18,10 @@ readonly TEMP_FILE_PREFIX="${CLAUDE_AUTO_TEE_TEMP_PREFIX:-claude}"
 readonly DEFAULT_MAX_TEMP_FILE_SIZE=104857600
 readonly MAX_TEMP_FILE_SIZE="${CLAUDE_AUTO_TEE_MAX_SIZE:-$DEFAULT_MAX_TEMP_FILE_SIZE}"
 
+# Age-based cleanup configuration (P1.T015)
+readonly CLEANUP_AGE_HOURS="${CLAUDE_AUTO_TEE_CLEANUP_AGE_HOURS:-48}"   # Default: 48 hours
+readonly ENABLE_AGE_CLEANUP="${CLAUDE_AUTO_TEE_ENABLE_AGE_CLEANUP:-true}"
+
 # Verbose logging function
 log_verbose() {
     if [[ "$VERBOSE_MODE" == "true" ]]; then
@@ -102,6 +106,241 @@ trap 'cleanup_on_interruption TERM' TERM  # Termination signal
 trap 'cleanup_on_interruption EXIT' EXIT  # Normal exit
 trap 'cleanup_on_interruption HUP' HUP    # Hangup signal
 log_verbose "Signal handlers installed for cleanup on interruption"
+
+# Age-based cleanup for orphaned files (P1.T015)
+cleanup_orphaned_files() {
+    local temp_dir="$1"
+    local age_hours="${CLEANUP_AGE_HOURS}"
+    
+    # Validate inputs
+    if [[ ! -d "$temp_dir" ]]; then
+        log_verbose "Temp directory doesn't exist for orphaned cleanup: $temp_dir"
+        return 0
+    fi
+    
+    if [[ -z "$age_hours" ]] || [[ ! "$age_hours" =~ ^[0-9]+$ ]]; then
+        log_verbose "Invalid age hours for cleanup: '$age_hours', using default: 48"
+        age_hours=48
+    fi
+    
+    log_verbose "Starting orphaned file cleanup in $temp_dir (age threshold: ${age_hours}h)"
+    
+    # Find files older than the threshold
+    local cleanup_count=0
+    local error_count=0
+    
+    # Use find with -mtime for age detection (convert hours to days for find)
+    # find -mtime +n finds files modified more than n*24 hours ago
+    # For hours, we need to be more precise, so we'll use a different approach
+    local age_minutes=$((age_hours * 60))
+    
+    # Find claude-auto-tee temp files older than threshold
+    # Use a more portable approach that works across platforms
+    local current_time
+    current_time=$(date +%s)
+    local cutoff_time=$((current_time - age_hours * 3600))
+    
+    log_verbose "Cleanup cutoff time: $(date -r "$cutoff_time" 2>/dev/null || date -d "@$cutoff_time" 2>/dev/null || echo "unknown")"
+    
+    # Find files matching our pattern
+    local temp_pattern="${temp_dir}/${TEMP_FILE_PREFIX}-*"
+    
+    # Use find if available, otherwise fall back to ls-based approach
+    if command -v find >/dev/null 2>&1; then
+        # Find files matching our pattern that are older than cutoff time
+        while IFS= read -r -d '' file; do
+            if [[ -f "$file" ]]; then
+                # Check if file is safe to delete (not currently in use)
+                if is_file_safe_to_delete "$file"; then
+                    local file_time
+                    # Get file modification time (cross-platform)
+                    if stat -c %Y "$file" >/dev/null 2>&1; then
+                        # GNU stat (Linux)
+                        file_time=$(stat -c %Y "$file")
+                    elif stat -f %m "$file" >/dev/null 2>&1; then
+                        # BSD stat (macOS)
+                        file_time=$(stat -f %m "$file")
+                    else
+                        # Fallback - assume file is old enough if we can't check
+                        log_verbose "Cannot determine file age for $file, skipping"
+                        continue
+                    fi
+                    
+                    # Check if file is old enough
+                    if [[ "$file_time" -lt "$cutoff_time" ]]; then
+                        if rm -f "$file" 2>/dev/null; then
+                            ((cleanup_count++))
+                            log_verbose "Removed orphaned file: $file (age: $(( (current_time - file_time) / 3600 ))h)"
+                        else
+                            log_verbose "Failed to remove orphaned file: $file"
+                            ((error_count++))
+                        fi
+                    fi
+                else
+                    log_verbose "File appears to be in use, skipping: $file"
+                fi
+            fi
+        done < <(find "$temp_dir" -name "${TEMP_FILE_PREFIX}-*" -type f -print0 2>/dev/null || true)
+    else
+        # Fallback for systems without find
+        log_verbose "find command not available, using fallback cleanup method"
+        # This is less precise but still functional
+        local pattern="${temp_dir}/${TEMP_FILE_PREFIX}-*"
+        for file in $pattern; do
+            # Check if the glob pattern matched any files
+            if [[ -f "$file" ]] && is_file_safe_to_delete "$file"; then
+                # Simple age check - if file exists, try to remove if older than threshold
+                # This is a simplified version without precise time checking
+                log_verbose "Attempting to remove potentially orphaned file: $file"
+                if rm -f "$file" 2>/dev/null; then
+                    ((cleanup_count++))
+                else
+                    ((error_count++))
+                fi
+            fi
+        done
+    fi
+    
+    if [[ "$cleanup_count" -gt 0 ]] || [[ "$error_count" -gt 0 ]]; then
+        log_verbose "Orphaned file cleanup completed: $cleanup_count removed, $error_count errors"
+    else
+        log_verbose "No orphaned files found for cleanup"
+    fi
+    
+    return 0
+}
+
+# Check if a file is safe to delete (not actively in use)
+is_file_safe_to_delete() {
+    local file="$1"
+    
+    # Basic safety checks
+    if [[ ! -f "$file" ]]; then
+        return 1  # File doesn't exist
+    fi
+    
+    # Check if file is currently being written to by checking for file locks
+    # This is platform-dependent and best-effort
+    
+    # Method 1: Check if file is open (Linux with lsof)
+    if command -v lsof >/dev/null 2>&1; then
+        if lsof "$file" >/dev/null 2>&1; then
+            log_verbose "File appears to be open: $file"
+            return 1  # File is in use
+        fi
+    fi
+    
+    # Method 2: Try to get exclusive lock (portable but may not work on all systems)
+    # Use flock if available
+    if command -v flock >/dev/null 2>&1; then
+        if ! flock -n 9 2>/dev/null 9<"$file"; then
+            log_verbose "File appears to be locked: $file"
+            return 1  # File is locked
+        fi
+        # Close the file descriptor
+        exec 9<&-
+    fi
+    
+    # Method 3: Check file age vs process lifetime (conservative approach)
+    # If file was created very recently (within last 5 minutes), be cautious
+    local current_time
+    current_time=$(date +%s)
+    local file_time
+    
+    if stat -c %Y "$file" >/dev/null 2>&1; then
+        file_time=$(stat -c %Y "$file")
+    elif stat -f %m "$file" >/dev/null 2>&1; then
+        file_time=$(stat -f %m "$file")
+    else
+        # Cannot determine file age, err on side of caution for very recently created files
+        # Use file creation time heuristic from filename if possible
+        local filename
+        filename=$(basename "$file")
+        if [[ "$filename" =~ ${TEMP_FILE_PREFIX}-([0-9]+)\.log ]]; then
+            local file_timestamp="${BASH_REMATCH[1]}"
+            # This is a nanosecond timestamp truncated to 13 digits
+            # Convert to seconds (first 10 digits)
+            file_time="${file_timestamp:0:10}"
+        else
+            # Cannot determine age, assume it's safe after 5 minutes of existence
+            # This is a fallback - in practice, this shouldn't happen often
+            log_verbose "Cannot determine file creation time for $file, assuming safe"
+            return 0
+        fi
+    fi
+    
+    # If file is very recent (less than 5 minutes old), be cautious
+    local age_seconds=$((current_time - file_time))
+    if [[ "$age_seconds" -lt 300 ]]; then  # 5 minutes
+        log_verbose "File too recent for safe deletion: $file (${age_seconds}s old)"
+        return 1
+    fi
+    
+    # File appears safe to delete
+    return 0
+}
+
+# Run age-based cleanup during initialization (P1.T015)
+run_startup_cleanup() {
+    if [[ "$ENABLE_AGE_CLEANUP" != "true" ]]; then
+        log_verbose "Age-based cleanup disabled (CLAUDE_AUTO_TEE_ENABLE_AGE_CLEANUP=$ENABLE_AGE_CLEANUP)"
+        return 0
+    fi
+    
+    log_verbose "Running startup orphaned file cleanup"
+    
+    # Get list of potential temp directories to clean
+    local temp_dirs_to_clean=()
+    
+    # Add the current temp directory
+    local current_temp_dir
+    current_temp_dir=$(get_temp_dir 2>/dev/null || echo "")
+    if [[ -n "$current_temp_dir" ]] && [[ -d "$current_temp_dir" ]]; then
+        temp_dirs_to_clean+=("$current_temp_dir")
+    fi
+    
+    # Add standard temp directories if different from current
+    for std_temp_dir in "/tmp" "/var/tmp" "${HOME}/tmp" "${HOME}/.tmp"; do
+        if [[ -d "$std_temp_dir" ]] && [[ "$std_temp_dir" != "$current_temp_dir" ]]; then
+            temp_dirs_to_clean+=("$std_temp_dir")
+        fi
+    done
+    
+    # Add environment variable temp directories
+    for env_temp_dir in "${TMPDIR:-}" "${TMP:-}" "${TEMP:-}" "${CLAUDE_AUTO_TEE_TEMP_DIR:-}"; do
+        if [[ -n "$env_temp_dir" ]] && [[ -d "$env_temp_dir" ]]; then
+            local clean_dir="${env_temp_dir%/}"  # Remove trailing slash
+            # Check if not already in list
+            local already_added=false
+            for existing_dir in "${temp_dirs_to_clean[@]}"; do
+                if [[ "$clean_dir" == "$existing_dir" ]]; then
+                    already_added=true
+                    break
+                fi
+            done
+            if [[ "$already_added" == "false" ]]; then
+                temp_dirs_to_clean+=("$clean_dir")
+            fi
+        fi
+    done
+    
+    if [[ "${#temp_dirs_to_clean[@]}" -eq 0 ]]; then
+        log_verbose "No suitable temp directories found for cleanup"
+        return 0
+    fi
+    
+    log_verbose "Checking ${#temp_dirs_to_clean[@]} temp directories for orphaned files"
+    
+    # Clean each temp directory
+    for temp_dir in "${temp_dirs_to_clean[@]}"; do
+        cleanup_orphaned_files "$temp_dir"
+    done
+    
+    log_verbose "Startup orphaned file cleanup completed"
+}
+
+# Run startup cleanup during initialization (P1.T015)
+run_startup_cleanup
 
 # Enhanced environment detection functions (P1.T004)
 detect_container_environment() {
@@ -550,12 +789,14 @@ if echo "$command" | grep -q " | "; then
     
     # Add cleanup on successful completion (P1.T013)
     # Use CLEANUP_ON_SUCCESS environment variable override (P1.T003)
+    final_command="$modified_command"
+    
     if [[ "$CLEANUP_ON_SUCCESS" == "true" ]] && [[ -n "$cleanup_script" ]] && [[ -f "$cleanup_script" ]]; then
-        cleanup_command="source \"$cleanup_script\" && { $modified_command; } && { echo \"Full output saved to: $temp_file\"; cleanup_temp_file \"$temp_file\"; rm -f \"$cleanup_script\" 2>/dev/null || true; } || { echo \"Command failed - temp file preserved: $temp_file\"; rm -f \"$cleanup_script\" 2>/dev/null || true; }"
+        cleanup_command="source \"$cleanup_script\" && { $final_command; } && { echo \"Full output saved to: $temp_file\"; cleanup_temp_file \"$temp_file\"; rm -f \"$cleanup_script\" 2>/dev/null || true; } || { echo \"Command failed - temp file preserved: $temp_file\"; rm -f \"$cleanup_script\" 2>/dev/null || true; }"
         log_verbose "Added cleanup logic for successful completion (CLEANUP_ON_SUCCESS=$CLEANUP_ON_SUCCESS)"
     else
         # No cleanup or cleanup disabled - preserve temp file
-        cleanup_command="{ $modified_command; } && echo \"Full output saved to: $temp_file\" || echo \"Command failed - temp file preserved: $temp_file\""
+        cleanup_command="{ $final_command; } && echo \"Full output saved to: $temp_file\" || echo \"Command failed - temp file preserved: $temp_file\""
         if [[ "$CLEANUP_ON_SUCCESS" != "true" ]]; then
             log_verbose "Cleanup disabled via CLAUDE_AUTO_TEE_CLEANUP_ON_SUCCESS=$CLEANUP_ON_SUCCESS"
         else

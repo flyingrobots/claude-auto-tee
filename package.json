@@ -7,7 +7,7 @@
     "test": "bash test/graceful-degradation-test.sh",
     "test:hook": "node test/test.js",
     "test:error-codes": "bash test/error-codes-test.sh",
-    "test:resources": "bash test/resource-management-test.sh", 
+    "test:resources": "bash test/resource-management-test.sh",
     "test:integration": "bash test/integration-test.sh",
     "test:activation": "echo 'Activation tests: PASS - graceful degradation for P1.T028 complete'",
     "test:performance": "bash test/graceful-degradation-test.sh && node test/test.js",
@@ -33,5 +33,12 @@
   "bugs": {
     "url": "https://github.com/flyingrobots/claude-auto-tee/issues"
   },
-  "homepage": "https://github.com/flyingrobots/claude-auto-tee#readme"
+  "homepage": "https://github.com/flyingrobots/claude-auto-tee#readme",
+  "devDependencies": {
+    "@next/eslint-plugin-next": "^15.4.6",
+    "eslint-config-next": "^15.4.6"
+  },
+  "dependencies": {
+    "next": "^15.4.6"
+  }
 }
