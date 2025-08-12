@@ -5,13 +5,17 @@
   "main": "hook.js",
   "scripts": {
     "test": "bash test/graceful-degradation-test.sh",
+    "test:hook": "node test/test.js",
+    "test:error-codes": "bash test/error-codes-test.sh",
+    "test:resources": "bash test/resource-management-test.sh", 
+    "test:integration": "bash test/integration-test.sh",
     "test:activation": "echo 'Activation tests: PASS - graceful degradation for P1.T028 complete'",
-    "test:performance": "bash test/graceful-degradation-test.sh",
-    "test:security": "bash test/graceful-degradation-test.sh",
-    "test:edge-cases": "bash test/graceful-degradation-test.sh",
-    "test:ci": "bash test/graceful-degradation-test.sh",
-    "test:all": "bash test/graceful-degradation-test.sh",
-    "test:cross-platform": "bash -c 'echo Testing on $(uname -s 2>/dev/null || echo Windows); bash test/graceful-degradation-test.sh'"
+    "test:performance": "bash test/graceful-degradation-test.sh && node test/test.js",
+    "test:security": "bash test/graceful-degradation-test.sh && bash test/error-codes-test.sh",
+    "test:edge-cases": "bash test/graceful-degradation-test.sh && bash test/integration-test.sh",
+    "test:ci": "bash test/graceful-degradation-test.sh && node test/test.js && bash test/error-codes-test.sh",
+    "test:all": "bash test/graceful-degradation-test.sh && node test/test.js && bash test/error-codes-test.sh && bash test/resource-management-test.sh && bash test/integration-test.sh",
+    "test:cross-platform": "bash -c 'echo Testing on $(uname -s 2>/dev/null || echo Windows); bash test/graceful-degradation-test.sh && node test/test.js && bash test/error-codes-test.sh && bash test/resource-management-test.sh && bash test/integration-test.sh'"
   },
   "repository": {
     "type": "git",

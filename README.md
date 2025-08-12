@@ -441,6 +441,44 @@ From the expert debate conclusion:
 | **Disk Space** | ~50KB for hook + temp file space |
 | **Permissions** | Read/write access to temp directory |
 
+## 🔧 Troubleshooting
+
+Having issues? We've got you covered:
+
+### Quick Diagnosis
+```bash
+# Run system diagnostic
+./scripts/diagnose.sh
+
+# This checks:
+# ✅ System requirements (bash, tee, mktemp)
+# ✅ Temp directory setup and permissions  
+# ✅ File creation and access permissions
+# ✅ Platform-specific configurations
+# ✅ Basic functionality testing
+```
+
+### Common Solutions
+
+| Error | Quick Fix |
+|-------|-----------|
+| Permission denied | `chmod 755 /tmp && export TMPDIR=/tmp` |
+| No temp directory | `mkdir -p /tmp && export TMPDIR=/tmp` |
+| Command not found | `export PATH="/usr/local/bin:$PATH"` |
+| Disk space issues | `rm -rf /tmp/claude-* && df -h /tmp` |
+
+### Debug Mode
+```bash
+# Enable detailed logging
+export CLAUDE_AUTO_TEE_DEBUG=1
+echo "your command" | claude-auto-tee
+
+# Check debug output
+ls -la /tmp/claude-*.log
+```
+
+📖 **Full troubleshooting guide**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+
 ## Philosophy
 
 **"Quick and dirty tool"** - exactly as requested:
