@@ -65,13 +65,13 @@ The longest dependency chain is **8 levels deep**:
 #### Day 2 Morning (4 hours)
 **Advanced Research & Planning**
 - [ ] [P1.T028](https://github.com/flyingrobots/claude-auto-tee/issues/29) - Define graceful degradation for common failures (1.5h)
-- [ ] [P1.T037](https://github.com/flyingrobots/claude-auto-tee/issues/8) - Update README.md with clear installation instructions (1.5h)
+- [x] [P1.T037](https://github.com/flyingrobots/claude-auto-tee/issues/8) - Update README.md with clear installation instructions (1.5h)
 - [ ] [P1.T041](https://github.com/flyingrobots/claude-auto-tee/issues/41) - Common error scenarios and solutions (1h)
 
 #### Day 2 Afternoon (4 hours)
 **Specialized Infrastructure**
 - [ ] [P1.T049](https://github.com/flyingrobots/claude-auto-tee/issues/49) - Expand existing test suite for new features (2h)
-- [ ] [P1.T053](https://github.com/flyingrobots/claude-auto-tee/issues/53) - Create comprehensive manual test checklist (1.5h)
+- [x] [P1.T053](https://github.com/flyingrobots/claude-auto-tee/issues/53) - Create comprehensive manual test checklist (1.5h)
 - [ ] [P1.T057](https://github.com/flyingrobots/claude-auto-tee/issues/57) - Identify beta testing group (0.5h)
 
 ### Days 3-4: Core Implementation Phase
