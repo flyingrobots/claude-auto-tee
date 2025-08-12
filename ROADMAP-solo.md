@@ -79,9 +79,9 @@ The longest dependency chain is **8 levels deep**:
 
 #### Day 3 Morning (4 hours)
 **Core Cross-Platform Implementation** ⚡ *Critical Path*
-- [ ] [P1.T002](https://github.com/flyingrobots/claude-auto-tee/issues/2) - Implement fallback hierarchy for temp directory detection (3h)
+- [x] [P1.T002](https://github.com/flyingrobots/claude-auto-tee/issues/2) - Implement fallback hierarchy for temp directory detection (3h)
   - *Depends on: P1.T001*
-- [ ] [P1.T005](https://github.com/flyingrobots/claude-auto-tee/issues/9) - Set up testing environments (1h)
+- [x] [P1.T005](https://github.com/flyingrobots/claude-auto-tee/issues/9) - Set up testing environments (1h)
 
 #### Day 3 Afternoon (4 hours)
 **Level 1 Dependencies - Platform Features**
