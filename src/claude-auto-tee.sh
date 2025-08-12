@@ -195,7 +195,10 @@ command_escaped=$(echo "$input" | sed -n 's/.*"command":"\([^"]*\(\\"[^"]*\)*\)"
 if [[ -z "$command_escaped" ]]; then
     log_verbose "No command found in JSON, checking for malformed JSON"
     if ! echo "$input" | grep -q '"tool"'; then
-        report_error $ERR_MALFORMED_JSON "Input does not appear to be valid tool JSON" true
+        log_verbose "Input does not appear to be valid tool JSON - passing through unchanged"
+        report_warning $ERR_MALFORMED_JSON "Malformed JSON input - graceful passthrough"
+        echo "$input"
+        exit 0
     fi
     # Not a bash command, pass through unchanged
     echo "$input"
