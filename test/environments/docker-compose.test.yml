@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # Basic Alpine Linux environment
+  # Basic Alpine Linux environment  
   alpine-test:
     build:
       context: ../../
@@ -9,85 +9,27 @@ services:
     volumes:
       - ../../:/app
       - test-results:/tmp/test-results
-      - ./test-data:/test-data:ro
     environment:
       - NODE_ENV=test
       - PLATFORM=alpine
-      - TEST_SUITE=basic
+      - TEST_SUITE=graceful-degradation
+      - GITHUB_ACTIONS=true
     working_dir: /app
+    command: bash test/graceful-degradation-test.sh
 
-  # Ubuntu environment for different behavior testing
+  # Ubuntu environment for cross-platform testing
   ubuntu-test:
-    image: node:18-bullseye
+    image: ubuntu:22.04
     volumes:
       - ../../:/app
       - test-results:/tmp/test-results
-      - ./test-data:/test-data:ro
     environment:
       - NODE_ENV=test
       - PLATFORM=ubuntu
-      - TEST_SUITE=basic
-    working_dir: /app
-    command: bash -c "apt-get update && apt-get install -y time uuid-runtime && npm test"
-
-  # Performance testing environment
-  performance-test:
-    build:
-      context: ../../
-      dockerfile: test/environments/Dockerfile.cross-platform
-    volumes:
-      - ../../:/app
-      - test-results:/tmp/test-results
-    environment:
-      - NODE_ENV=performance
-      - TEST_SUITE=performance
-    working_dir: /app
-    command: node test/performance/benchmark.js
-
-  # Security testing environment
-  security-test:
-    build:
-      context: ../../
-      dockerfile: test/environments/Dockerfile.cross-platform
-    volumes:
-      - ../../:/app
-      - test-results:/tmp/test-results
-    environment:
-      - NODE_ENV=security
-      - TEST_SUITE=security
-    working_dir: /app
-    user: restricteduser
-    command: node test/security/security-tests.js
-
-  # Edge case testing environment
-  edge-case-test:
-    build:
-      context: ../../
-      dockerfile: test/environments/Dockerfile.cross-platform
-    volumes:
-      - ../../:/app
-      - test-results:/tmp/test-results
-    environment:
-      - NODE_ENV=edge-cases
-      - TEST_SUITE=edge-cases
-    working_dir: /app
-    command: node test/edge-cases/edge-case-tests.js
-
-  # CI/CD simulation environment
-  ci-test:
-    build:
-      context: ../../
-      dockerfile: test/environments/Dockerfile.cross-platform
-    volumes:
-      - ../../:/app
-      - test-results:/tmp/test-results
-    environment:
-      - CI=true
-      - NODE_ENV=ci
-      - TEST_SUITE=ci
+      - TEST_SUITE=graceful-degradation
       - GITHUB_ACTIONS=true
     working_dir: /app
-    command: node test/ci/ci-tests.js
+    command: bash -c "apt-get update && apt-get install -y bash && bash test/graceful-degradation-test.sh"
 
 volumes:
   test-results:

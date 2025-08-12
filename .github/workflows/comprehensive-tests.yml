@@ -153,6 +153,9 @@ jobs:
     - name: Build test environment
       run: docker build -t claude-auto-tee-test -f test/environments/Dockerfile.cross-platform .
     
+    - name: Create results directory
+      run: mkdir -p /tmp/ci-results
+    
     - name: Run comprehensive tests in Alpine
       run: docker run --rm -v /tmp/ci-results:/tmp/test-results claude-auto-tee-test npm run test:all
     
