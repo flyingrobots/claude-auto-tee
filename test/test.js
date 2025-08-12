@@ -7,7 +7,7 @@ const { execSync, spawn } = require('child_process');
 const path = require('path');
 const assert = require('assert');
 
-const HOOK_PATH = path.join(__dirname, '..', 'src', 'hook.js');
+const HOOK_PATH = path.join(__dirname, '..', 'src', 'claude-auto-tee.sh');
 
 // Test runner
 async function runTests() {
@@ -18,10 +18,11 @@ async function runTests() {
     testSimpleBuildCommand,
     testPipelineInjection,
     testSkipRedirections,
-    testSkipInteractiveCommands,
+    testSkipNonPipeCommands,
     testSkipExistingTee,
     testShortCommandSkip,
     testComplexPipelines,
+    testPipeOnlyDetection,
     testErrorHandling
   ];
   
@@ -46,10 +47,10 @@ async function runTests() {
   }
 }
 
-// Helper to run hook with input
+// Helper to run bash hook with input
 function runHook(toolData) {
   return new Promise((resolve, reject) => {
-    const child = spawn('node', [HOOK_PATH], { 
+    const child = spawn('bash', [HOOK_PATH], { 
       stdio: ['pipe', 'pipe', 'pipe'] 
     });
     
@@ -98,12 +99,9 @@ async function testSimpleBuildCommand() {
   };
   
   const result = await runHook(input);
-  const cmd = result.tool.input.command;
   
-  assert(cmd.includes('tee'), 'Should inject tee');
-  assert(cmd.includes('/tmp/claude-'), 'Should use temp file');
-  assert(cmd.includes('head -100'), 'Should add head truncation');
-  assert(cmd.includes('Full output saved to:'), 'Should show temp file location');
+  // New implementation: no pipes = no activation
+  assert.deepEqual(result, input, 'Commands without pipes should pass through unchanged');
 }
 
 async function testPipelineInjection() {
@@ -119,7 +117,8 @@ async function testPipelineInjection() {
   
   assert(cmd.includes('| tee'), 'Should inject tee into pipeline');
   assert(cmd.includes('| tail -10'), 'Should preserve existing tail');
-  assert(!cmd.includes('| head'), 'Should not add head when tail exists');
+  assert(cmd.includes('/tmp/claude-'), 'Should use temp file');
+  assert(cmd.includes('Full output saved to:'), 'Should show temp file location');
 }
 
 async function testSkipRedirections() {
@@ -134,18 +133,19 @@ async function testSkipRedirections() {
   assert.deepEqual(result, input, 'Commands with redirections should pass through');
 }
 
-async function testSkipInteractiveCommands() {
+async function testSkipNonPipeCommands() {
   const testCases = [
     'npm run dev',
     'yarn start', 
-    'watch test',
-    'npm run serve'
+    'npm run build',
+    'find . -name "*.js"',
+    'git log --oneline'
   ];
   
   for (const command of testCases) {
     const input = { tool: { name: 'Bash', input: { command } } };
     const result = await runHook(input);
-    assert.deepEqual(result, input, `Interactive command "${command}" should pass through`);
+    assert.deepEqual(result, input, `Non-pipe command "${command}" should pass through`);
   }
 }
 
@@ -170,7 +170,7 @@ async function testShortCommandSkip() {
   };
   
   const result = await runHook(input);
-  assert.deepEqual(result, input, 'Short commands should pass through');
+  assert.deepEqual(result, input, 'Commands without pipes should pass through');
 }
 
 async function testComplexPipelines() {
@@ -188,12 +188,44 @@ async function testComplexPipelines() {
   assert(cmd.includes('| grep -v node_modules | head -20'), 'Should preserve rest of pipeline');
 }
 
+async function testPipeOnlyDetection() {
+  // Test the core pipe-only logic
+  const testCases = [
+    // Should activate (has pipe, no existing tee)
+    { command: 'npm run build | head -10', shouldActivate: true },
+    { command: 'find . -name "*.js" | grep test', shouldActivate: true },
+    { command: 'ls -la | wc -l', shouldActivate: true },
+    { command: 'echo "test" | cat', shouldActivate: true },
+    
+    // Should NOT activate (no pipes)
+    { command: 'npm run build', shouldActivate: false },
+    { command: 'find . -name "*.js"', shouldActivate: false },
+    { command: 'ls -la', shouldActivate: false },
+    { command: 'echo "test"', shouldActivate: false },
+    
+    // Should NOT activate (already has tee)
+    { command: 'npm run build | tee output.log', shouldActivate: false },
+    { command: 'find . -name "*.js" | tee results.txt | head -10', shouldActivate: false }
+  ];
+
+  for (const testCase of testCases) {
+    const input = { tool: { name: 'Bash', input: { command: testCase.command } } };
+    const result = await runHook(input);
+    
+    const wasActivated = result.tool.input.command !== testCase.command && 
+                        result.tool.input.command.includes('tee');
+    
+    assert.strictEqual(wasActivated, testCase.shouldActivate, 
+      `Pipe detection failed for: "${testCase.command}" (expected ${testCase.shouldActivate}, got ${wasActivated})`);
+  }
+}
+
 async function testErrorHandling() {
   // Test with malformed JSON
   const malformedInput = '{"tool": {"name": "Bash", "input"';
   
   return new Promise((resolve, reject) => {
-    const child = spawn('node', [HOOK_PATH], { 
+    const child = spawn('bash', [HOOK_PATH], { 
       stdio: ['pipe', 'pipe', 'pipe'] 
     });
     
@@ -217,10 +249,10 @@ async function testErrorHandling() {
 async function testInstallation() {
   try {
     // This would test the actual installation, but requires file system changes
-    // For now, just verify the installer exists
+    // For now, just verify the bash script exists
     const fs = require('fs');
-    const installerPath = path.join(__dirname, '..', 'install.js');
-    assert(fs.existsSync(installerPath), 'Installer should exist');
+    const scriptPath = path.join(__dirname, '..', 'src', 'claude-auto-tee.sh');
+    assert(fs.existsSync(scriptPath), 'Bash script should exist');
   } catch (error) {
     throw new Error(`Installation test failed: ${error.message}`);
   }
@@ -230,3 +262,5 @@ async function testInstallation() {
 if (require.main === module) {
   runTests().catch(console.error);
 }
+
+module.exports = { runTests };
