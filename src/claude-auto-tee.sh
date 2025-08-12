@@ -414,7 +414,7 @@ if echo "$command" | grep -q " | "; then
     log_verbose "Checking disk space for command execution..."
     
     # Use enhanced space checking with meaningful error messages (P1.T019)
-    local space_check_result
+    space_check_result=""
     if ! check_space_with_detailed_errors "$temp_dir" "$command" "$VERBOSE_MODE"; then
         space_check_result=$?
         clear_error_context
