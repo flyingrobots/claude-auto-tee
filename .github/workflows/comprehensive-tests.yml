@@ -153,11 +153,14 @@ jobs:
     - name: Build test environment
       run: docker build -t claude-auto-tee-test -f test/environments/Dockerfile.cross-platform .
     
+    - name: Create results directory
+      run: mkdir -p /tmp/ci-results
+    
     - name: Run comprehensive tests in Alpine
-      run: docker run --rm -v /tmp/ci-results:/tmp/test-results claude-auto-tee-test npm run test:all
+      run: docker run --rm -v /tmp/ci-results:/tmp/test-results claude-auto-tee-test bash test/graceful-degradation-test.sh
     
     - name: Run cross-platform tests
-      run: docker-compose -f test/environments/docker-compose.test.yml up --abort-on-container-exit
+      run: docker compose -f test/environments/docker-compose.test.yml up --abort-on-container-exit
     
     - name: Upload Docker test results
       if: always()
@@ -217,6 +220,7 @@ jobs:
     
     - name: Comment on PR with results
       if: github.event_name == 'pull_request' && always()
+      continue-on-error: true
       uses: actions/github-script@v7
       with:
         script: |

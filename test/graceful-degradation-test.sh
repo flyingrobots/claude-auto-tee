@@ -321,8 +321,21 @@ run_all_tests() {
     echo "Graceful Degradation Test Suite"
     echo "======================================="
     
-    # Create test results directory for CI
-    mkdir -p /tmp/test-results
+    # Create test results directory for CI (cross-platform)
+    if [ -n "${GITHUB_ACTIONS}" ]; then
+        # In GitHub Actions
+        if [ -d "/tmp" ]; then
+            mkdir -p /tmp/test-results
+        elif [ -n "${TEMP}" ]; then
+            # Windows
+            mkdir -p "${TEMP}/test-results"
+        else
+            # Fallback
+            mkdir -p ./test-results
+        fi
+    else
+        mkdir -p /tmp/test-results 2>/dev/null || mkdir -p ./test-results
+    fi
     
     # Set up test environment
     export CLAUDE_AUTO_TEE_VERBOSE=1  # Enable verbose mode for testing
@@ -346,7 +359,21 @@ run_all_tests() {
     echo "  Failed: $TESTS_FAILED"
     echo "======================================="
     
-    # Write test results for CI
+    # Write test results for CI (cross-platform)
+    local test_results_dir
+    if [ -n "${GITHUB_ACTIONS}" ]; then
+        if [ -d "/tmp" ]; then
+            test_results_dir="/tmp/test-results"
+        elif [ -n "${TEMP}" ]; then
+            test_results_dir="${TEMP}/test-results"
+        else
+            test_results_dir="./test-results"
+        fi
+    else
+        test_results_dir="/tmp/test-results"
+        [ ! -d "/tmp/test-results" ] && test_results_dir="./test-results"
+    fi
+    
     {
         echo "# Graceful Degradation Test Results"
         echo ""
@@ -364,7 +391,9 @@ run_all_tests() {
         fi
         echo ""
         echo "Generated at: $(date)"
-    } > /tmp/test-results/test-summary.md
+        echo "Platform: $(uname -s 2>/dev/null || echo 'Unknown')"
+        echo "Results dir: $test_results_dir"
+    } > "$test_results_dir/test-summary.md"
     
     if [ $TESTS_FAILED -eq 0 ]; then
         echo "✓ All tests passed!"
