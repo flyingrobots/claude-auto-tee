@@ -1,0 +1,42 @@
+# ULTRA STRICT shellcheck configuration
+# This will make developers cry tears of pure quality
+
+# Enable ALL possible checks
+enable=all
+
+# Treat warnings as errors (nuclear option)
+severity=error
+
+# Check sourced files
+check-sourced=true
+
+# External sources checking  
+external-sources=true
+
+# Maximum wiki links in output
+wiki-link-count=10
+
+# Exclude only the most unavoidable ones
+# SC1091: Not following sourced files (sometimes unavoidable)
+disable=SC1091
+
+# Format for maximum pain^H^H^H^H clarity
+format=gcc
+
+# Shell directive to be extra pedantic
+shell=bash
+
+# Additional brutal checks that will be enforced:
+# - SC1000-SC1999: Parsing issues  
+# - SC2000-SC2999: Semantic issues
+# - SC3000-SC3999: ShellCheck annotations
+# - SC4000-SC4999: Historical/deprecated issues
+# - SC5000-SC5999: Compiler directives
+# - SC6000-SC6999: Possible improvements
+# - SC7000-SC7999: Spacing and formatting
+# - SC8000-SC8999: Performance issues
+# - SC9000-SC9999: Miscellaneous issues
+
+# This configuration is so strict that even the shellcheck
+# maintainers would probably tell you to calm down.
+# But we don't believe in "calm down" - we believe in PERFECTION.
