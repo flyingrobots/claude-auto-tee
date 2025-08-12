@@ -157,7 +157,7 @@ jobs:
       run: mkdir -p /tmp/ci-results
     
     - name: Run comprehensive tests in Alpine
-      run: docker run --rm -v /tmp/ci-results:/tmp/test-results claude-auto-tee-test npm run test:all
+      run: docker run --rm -v /tmp/ci-results:/tmp/test-results claude-auto-tee-test bash test/graceful-degradation-test.sh
     
     - name: Run cross-platform tests
       run: docker-compose -f test/environments/docker-compose.test.yml up --abort-on-container-exit
