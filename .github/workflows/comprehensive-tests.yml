@@ -160,7 +160,7 @@ jobs:
       run: docker run --rm -v /tmp/ci-results:/tmp/test-results claude-auto-tee-test bash test/graceful-degradation-test.sh
     
     - name: Run cross-platform tests
-      run: docker-compose -f test/environments/docker-compose.test.yml up --abort-on-container-exit
+      run: docker compose -f test/environments/docker-compose.test.yml up --abort-on-container-exit
     
     - name: Upload Docker test results
       if: always()
