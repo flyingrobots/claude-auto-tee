@@ -20,7 +20,7 @@ echo "================================="
 
 # Run integrity check first
 echo -e "${YELLOW}Running integrity check...${NC}"
-if ! "$SCRIPT_DIR/../integrity-guard.sh"; then
+if ! "$PROJECT_ROOT/scripts/integrity-guard.sh"; then
     echo -e "${RED}${BOLD}🚫 PUSH BLOCKED: Integrity check failed!${NC}" >&2
     exit 1
 fi
