@@ -752,15 +752,168 @@ fi
 
 clear_error_context
 
-# Check if command contains pipe and doesn't already have tee  
-if echo "$command" | grep -q " | "; then
+# Security validation and safe pipe detection
+validate_command_security() {
+    local cmd="$1"
+    
+    # 1. Syntax validation using bash parser
+    if ! bash -n <<< "$cmd" 2>/dev/null; then
+        log_verbose "Command failed syntax validation"
+        return 1
+    fi
+    
+    # 2. Security checks - reject dangerous patterns
+    if echo "$cmd" | grep -qE '[;&|]{2,}|[;&]|\$\(|\`|\\'; then
+        log_verbose "Command contains potentially dangerous operators or expansions"
+        return 1
+    fi
+    
+    # 3. Length check
+    if [[ "${#cmd}" -gt 500 ]]; then
+        log_verbose "Command too long (>${#cmd} chars)"
+        return 1
+    fi
+    
+    # 4. Quote balance check
+    local single_quotes double_quotes
+    single_quotes=$(echo "$cmd" | grep -o "'" | wc -l)
+    double_quotes=$(echo "$cmd" | grep -o '"' | wc -l)
+    if [[ $((single_quotes % 2)) -ne 0 ]] || [[ $((double_quotes % 2)) -ne 0 ]]; then
+        log_verbose "Unbalanced quotes detected"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Safe pipe detection that respects quotes
+detect_safe_pipes() {
+    local cmd="$1"
+    local in_single_quote=false
+    local in_double_quote=false
+    local escaped=false
+    local pipe_positions=()
+    local i=0
+    
+    while [[ $i -lt ${#cmd} ]]; do
+        local char="${cmd:$i:1}"
+        local next_char="${cmd:$((i+1)):1}"
+        local prev_char="${cmd:$((i-1)):1}"
+        
+        if [[ "$escaped" == "true" ]]; then
+            escaped=false
+            ((i++))
+            continue
+        fi
+        
+        case "$char" in
+            '\\')
+                escaped=true
+                ;;
+            "'")
+                if [[ "$in_double_quote" == "false" ]]; then
+                    in_single_quote=$([[ "$in_single_quote" == "true" ]] && echo "false" || echo "true")
+                fi
+                ;;
+            '"')
+                if [[ "$in_single_quote" == "false" ]]; then
+                    in_double_quote=$([[ "$in_double_quote" == "true" ]] && echo "false" || echo "true")
+                fi
+                ;;
+            '|')
+                if [[ "$in_single_quote" == "false" ]] && [[ "$in_double_quote" == "false" ]]; then
+                    # Check for proper pipe with spaces
+                    if [[ "$prev_char" == " " ]] && [[ "$next_char" == " " ]]; then
+                        pipe_positions+=($i)
+                    fi
+                fi
+                ;;
+        esac
+        
+        ((i++))
+    done
+    
+    echo "${#pipe_positions[@]}"
+    return 0
+}
+
+# Get position of first safe pipe
+detect_first_pipe_position() {
+    local cmd="$1"
+    local in_single_quote=false
+    local in_double_quote=false
+    local escaped=false
+    local i=0
+    
+    while [[ $i -lt ${#cmd} ]]; do
+        local char="${cmd:$i:1}"
+        local next_char="${cmd:$((i+1)):1}"
+        local prev_char="${cmd:$((i-1)):1}"
+        
+        if [[ "$escaped" == "true" ]]; then
+            escaped=false
+            ((i++))
+            continue
+        fi
+        
+        case "$char" in
+            '\\')
+                escaped=true
+                ;;
+            "'")
+                if [[ "$in_double_quote" == "false" ]]; then
+                    in_single_quote=$([[ "$in_single_quote" == "true" ]] && echo "false" || echo "true")
+                fi
+                ;;
+            '"')
+                if [[ "$in_single_quote" == "false" ]]; then
+                    in_double_quote=$([[ "$in_double_quote" == "true" ]] && echo "false" || echo "true")
+                fi
+                ;;
+            '|')
+                if [[ "$in_single_quote" == "false" ]] && [[ "$in_double_quote" == "false" ]]; then
+                    # Check for proper pipe with spaces
+                    if [[ "$prev_char" == " " ]] && [[ "$next_char" == " " ]]; then
+                        echo "$i"
+                        return 0
+                    fi
+                fi
+                ;;
+        esac
+        
+        ((i++))
+    done
+    
+    echo "-1"
+    return 0
+}
+
+# Check if command contains pipe and doesn't already have tee
+log_verbose "Validating command security: $command"
+if ! validate_command_security "$command"; then
+    log_verbose "Command failed security validation - passing through unchanged"
+    echo "$input"
+    exit 0
+fi
+
+pipe_count=$(detect_safe_pipes "$command")
+if [[ "$pipe_count" -gt 0 ]]; then
     if echo "$command" | grep -q "tee "; then
         # Skip - already has tee
+        log_verbose "Command already contains tee - passing through unchanged"
         echo "$input"
         exit 0
     fi
-    # Process - has pipe but no tee
-    log_verbose "Pipe command detected: $command"
+    
+    # Additional check: only handle simple single-pipe commands for security
+    if [[ "$pipe_count" -ne 1 ]]; then
+        log_verbose "Multiple pipes detected ($pipe_count) - passing through unchanged for security"
+        echo "$input"
+        exit 0
+    fi
+    
+    # Process - has single pipe but no tee
+    log_verbose "Safe single pipe command detected: $command"
     
     # Get suitable temp directory with error context
     set_error_context "Detecting suitable temp directory"
@@ -861,25 +1014,33 @@ if echo "$command" | grep -q " | "; then
     
     clear_error_context
     
-    # Find first pipe and split command
-    before_pipe="${command%% | *}"
-    after_pipe="${command#* | }"
+    # Find first pipe and split command using quote-aware detection
+    pipe_position=$(detect_first_pipe_position "$command")
+    if [[ "$pipe_position" -eq -1 ]]; then
+        log_verbose "No valid pipe found after security validation - passing through unchanged"
+        echo "$input"
+        exit 0
+    fi
+    
+    before_pipe="${command:0:$((pipe_position-1))}"
+    after_pipe="${command:$((pipe_position+3))}"
     log_verbose "Split command - before pipe: $before_pipe"
     log_verbose "Split command - after pipe: $after_pipe"
     
     # Construct modified command with tee, size limits, and cleanup (P1.T013, P1.T018)
+    # FIXED: tee should capture full output, size limiting only applies to downstream pipeline
     # Only add 2>&1 if not already present
     if echo "$before_pipe" | grep -q "2>&1"; then
-        base_tee_command="$before_pipe | head -c $MAX_TEMP_FILE_SIZE | tee \"$temp_file\""
-        log_verbose "Command already has 2>&1, tee with size limit: $base_tee_command"
+        base_tee_command="$before_pipe | tee \"$temp_file\" | head -c $MAX_TEMP_FILE_SIZE"
+        log_verbose "Command already has 2>&1, tee captures full output, size limit applied to pipeline: $base_tee_command"
     else
-        base_tee_command="$before_pipe 2>&1 | head -c $MAX_TEMP_FILE_SIZE | tee \"$temp_file\""
-        log_verbose "Added 2>&1 and tee with size limit: $base_tee_command"
+        base_tee_command="$before_pipe 2>&1 | tee \"$temp_file\" | head -c $MAX_TEMP_FILE_SIZE"
+        log_verbose "Added 2>&1, tee captures full output, size limit applied to pipeline: $base_tee_command"
     fi
     
-    # Add size warning when truncation occurs
-    modified_command="{ $base_tee_command; SIZE_CHECK=\$(wc -c < \"$temp_file\" 2>/dev/null || echo 0); if [[ \$SIZE_CHECK -ge $MAX_TEMP_FILE_SIZE ]]; then echo \"[CLAUDE-AUTO-TEE] WARNING: Output truncated at $((MAX_TEMP_FILE_SIZE / 1024 / 1024))MB limit\" >&2; fi; } | $after_pipe"
-    log_verbose "Added size monitoring and truncation warning: $modified_command"
+    # Add size warning when pipeline truncation occurs (temp file may still contain full output)
+    modified_command="{ $base_tee_command; PIPELINE_SIZE=\$?; TEMP_SIZE=\$(wc -c < \"$temp_file\" 2>/dev/null || echo 0); if [[ \$TEMP_SIZE -gt $MAX_TEMP_FILE_SIZE ]]; then echo \"[CLAUDE-AUTO-TEE] INFO: Full output (\$TEMP_SIZE bytes) saved to temp file, pipeline limited to $((MAX_TEMP_FILE_SIZE / 1024 / 1024))MB\" >&2; fi; } | $after_pipe"
+    log_verbose "Pipeline receives size-limited data, temp file contains full output: $modified_command"
     
     # Add cleanup on successful completion (P1.T013)
     # Use CLEANUP_ON_SUCCESS environment variable override (P1.T003)
