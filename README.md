@@ -45,16 +45,63 @@ Following structured expert debate with **unanimous 5-0 vote for radical simplif
 
 ## Installation
 
-Copy the single file to your system:
+### Prerequisites
+
+- **Claude Code** installed and configured
+- **Bash** 3.0+ (pre-installed on macOS/Linux, available via WSL on Windows)
+- **Write access** to temp directory (`/tmp` on Unix, `$TEMP` on Windows)
+- **Git** (for installation)
+
+### Quick Install (Recommended)
+
+**1. Clone the repository:**
+```bash
+git clone https://github.com/flyingrobots/claude-auto-tee.git
+cd claude-auto-tee
+```
+
+**2. Make the hook executable:**
+```bash
+chmod +x src/claude-auto-tee.sh
+```
+
+**3. Install globally (recommended for all projects):**
+```bash
+# Create Claude Code config directory
+mkdir -p ~/.claude
+
+# Install hook with absolute path
+echo '{
+  "hooks": {
+    "preToolUse": [
+      {
+        "command": "'$(pwd)'/src/claude-auto-tee.sh",
+        "matchers": ["Bash"]
+      }
+    ]
+  }
+}' > ~/.claude/settings.json
+```
+
+**4. Verify installation:**
+```bash
+# Check hook is configured
+cat ~/.claude/settings.json
+
+# Test with Claude Code (should show tee injection)
+echo 'ls -la | head -5' | ./src/claude-auto-tee.sh
+```
+
+### Alternative Installation Methods
+
+#### Option A: System-wide Installation
 
 ```bash
-# Clone repo
-git clone https://github.com/yourusername/claude-auto-tee.git
+# Copy to system path
+sudo cp src/claude-auto-tee.sh /usr/local/bin/claude-auto-tee.sh
+sudo chmod +x /usr/local/bin/claude-auto-tee.sh
 
-# Copy hook script
-cp claude-auto-tee/src/claude-auto-tee.sh /usr/local/bin/
-
-# Install as Claude Code hook (global)
+# Configure Claude Code
 mkdir -p ~/.claude
 echo '{
   "hooks": {
@@ -68,8 +115,10 @@ echo '{
 }' > ~/.claude/settings.json
 ```
 
-Or install locally for current project:
+#### Option B: Project-local Installation
+
 ```bash
+# For specific projects only
 mkdir -p .claude
 echo '{
   "hooks": {
@@ -83,6 +132,102 @@ echo '{
 }' > .claude/settings.json
 ```
 
+#### Option C: Homebrew (macOS)
+
+```bash
+# Install via Homebrew tap (coming soon)
+brew tap flyingrobots/claude-auto-tee
+brew install claude-auto-tee
+
+# Auto-configures Claude Code hooks
+```
+
+### Platform-Specific Setup
+
+#### macOS
+- Uses `/tmp/` for temporary files
+- Requires Xcode Command Line Tools for git
+- Homebrew installation recommended
+
+#### Linux
+- Uses `/tmp/` for temporary files
+- Works on all major distributions (Ubuntu, CentOS, Arch, etc.)
+- No additional dependencies
+
+#### Windows (WSL)
+- Requires Windows Subsystem for Linux
+- Uses WSL's `/tmp/` directory
+- Install via WSL terminal:
+```bash
+# In WSL terminal
+sudo apt update && sudo apt install git
+git clone https://github.com/flyingrobots/claude-auto-tee.git
+# Follow Linux installation steps
+```
+
+### Verification
+
+**Test the installation:**
+
+```bash
+# 1. Verify hook responds
+echo '{"tool":{"name":"Bash","input":{"command":"echo test | head -1"}},"timeout":null}' | ~/.claude/hooks/claude-auto-tee.sh
+
+# Expected output: JSON with tee injection
+# {"tool":{"name":"Bash","input":{"command":"echo test 2>&1 | tee \"/tmp/claude-....log\" | head -1 ; echo \"Full output saved to: /tmp/claude-....log\""}},"timeout":null}
+
+# 2. Test in Claude Code
+# Run any command with a pipe, e.g.: ls -la | head -5
+# Should see: "Full output saved to: /tmp/claude-xyz.log"
+
+# 3. Check temp file was created
+ls -la /tmp/claude-*.log
+```
+
+### Troubleshooting
+
+**Common Issues:**
+
+1. **"Permission denied"**
+   ```bash
+   chmod +x src/claude-auto-tee.sh
+   ```
+
+2. **"No such file or directory"**
+   - Use absolute paths in settings.json
+   - Verify file exists: `ls -la src/claude-auto-tee.sh`
+
+3. **"Hook not triggering"**
+   - Check settings.json syntax: `cat ~/.claude/settings.json | jq`
+   - Restart Claude Code after configuration changes
+   - Verify Claude Code hook support is enabled
+
+4. **"Temp files not created"**
+   - Check temp directory permissions: `ls -ld /tmp`
+   - Verify disk space: `df -h /tmp`
+
+5. **"Command not modified"**
+   - Ensure command contains ` | ` (pipe with spaces)
+   - Check that command doesn't already contain `tee`
+
+**Debug mode:**
+```bash
+# Enable verbose debugging
+CLAUDE_AUTO_TEE_DEBUG=1 ./src/claude-auto-tee.sh
+```
+
+**Uninstall:**
+```bash
+# Remove global configuration
+rm ~/.claude/settings.json
+
+# Remove system installation
+sudo rm /usr/local/bin/claude-auto-tee.sh
+
+# Remove project files
+rm -rf claude-auto-tee/
+```
+
 ## How It Works
 
 **Pure pipe-only activation**:
@@ -94,28 +239,80 @@ That's it. No pattern matching, no complex logic, no edge cases.
 
 ## Examples
 
-### Simple Pipeline
+### Basic Pipeline
 ```bash
+# Input command:
 find . -name "*.js" | wc -l
-# → find . -name "*.js" 2>&1 | tee /tmp/claude-xyz.log | wc -l
+
+# Auto-transformed to:
+find . -name "*.js" 2>&1 | tee /tmp/claude-xyz.log | wc -l
+# Full output saved to: /tmp/claude-xyz.log
 ```
 
-### Complex Pipeline  
+### Complex Multi-stage Pipeline
 ```bash
-cat large.log | grep ERROR | head -20
-# → cat large.log 2>&1 | tee /tmp/claude-xyz.log | grep ERROR | head -20
+# Input command:
+cat large.log | grep ERROR | sort | uniq -c | head -10
+
+# Auto-transformed to:
+cat large.log 2>&1 | tee /tmp/claude-xyz.log | grep ERROR | sort | uniq -c | head -10
+# Full output saved to: /tmp/claude-xyz.log
 ```
 
-### Skipped (No Pipe)
+### Development Workflow
 ```bash
+# Build and show only last 10 lines
+npm run build 2>&1 | tail -10
+
+# But full build log saved automatically to:
+# /tmp/claude-1234567890.log
+
+# Later, analyze full output:
+cat /tmp/claude-1234567890.log | grep -i error
+```
+
+### Log Analysis
+```bash
+# Show recent errors from large log
+tail -1000 /var/log/app.log | grep ERROR | head -20
+
+# Full 1000 lines saved for deeper analysis:
+# /tmp/claude-1234567891.log
+```
+
+### Performance Testing
+```bash
+# Time a command and see summary
+time ./my-script.sh | grep "completed"
+
+# Full output with timing details saved:
+# /tmp/claude-1234567892.log
+```
+
+### Data Processing
+```bash
+# Process CSV and show summary
+cat data.csv | awk -F, '{sum+=$3} END {print "Total:", sum}' | head -1
+
+# Complete processing log available in:
+# /tmp/claude-1234567893.log
+```
+
+### Skipped Commands (No Transformation)
+
+```bash
+# No pipes - unchanged
 npm run build
-# → npm run build (unchanged)
-```
+ls -la
+echo "hello world"
 
-### Skipped (Has Tee)
-```bash
+# Already has tee - unchanged  
 npm test | tee results.log
-# → npm test | tee results.log (unchanged)
+cat file.txt | tee backup.txt | grep pattern
+
+# Stderr redirect only - unchanged
+command 2>&1
+command 2>/dev/null
 ```
 
 ## Performance
@@ -136,22 +333,80 @@ npm test | tee results.log
 - **Cross-platform** - works on macOS, Linux, Windows (WSL)
 - **Zero config** - works immediately after installation
 
+## Configuration
+
+### Basic Configuration
+
+The default configuration works for most users. Advanced options:
+
+```json
+{
+  "hooks": {
+    "preToolUse": [
+      {
+        "command": "/path/to/claude-auto-tee.sh",
+        "matchers": ["Bash"],
+        "env": {
+          "CLAUDE_AUTO_TEE_DEBUG": "0",
+          "CLAUDE_AUTO_TEE_TEMP_DIR": "/tmp"
+        }
+      }
+    ]
+  }
+}
+```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CLAUDE_AUTO_TEE_DEBUG` | `0` | Enable debug output (0/1) |
+| `CLAUDE_AUTO_TEE_TEMP_DIR` | `/tmp` | Custom temp directory |
+| `CLAUDE_AUTO_TEE_PREFIX` | `claude-` | Custom temp file prefix |
+
+### Multiple Hooks
+
+Combine with other hooks:
+
+```json
+{
+  "hooks": {
+    "preToolUse": [
+      {
+        "command": "/usr/local/bin/claude-auto-tee.sh",
+        "matchers": ["Bash"]
+      },
+      {
+        "command": "/usr/local/bin/other-hook.sh",
+        "matchers": ["Python"]
+      }
+    ]
+  }
+}
+```
+
 ## Testing
 
-All tests passing (34+ tests across 6 test suites):
+Comprehensive test suite with graceful degradation:
 
 ```bash
 # Run full test suite
 cd claude-auto-tee
 npm test
 
+# Run specific test suites
+npm run test:security      # Security tests
+npm run test:performance   # Performance benchmarks  
+npm run test:edge-cases    # Edge case handling
+
 # Tests cover:
-# - Pure pipe detection logic
-# - Temp file generation  
+# - Pure pipe detection logic (27 tests)
+# - Temp file generation and cleanup
 # - JSON parsing/reconstruction
-# - Security edge cases
-# - Performance benchmarks
+# - Security edge cases and injection prevention
+# - Graceful degradation and error handling
 # - Cross-platform compatibility
+# - Performance benchmarks (165x improvement verified)
 ```
 
 ## Why This Approach Won
@@ -168,12 +423,23 @@ From the expert debate conclusion:
 
 ## Quick Start
 
-1. Copy `src/claude-auto-tee.sh` to your system
-2. Add to Claude Code hooks configuration
-3. Use pipes in your commands: `command | tail -10`  
-4. Full output automatically saved to `/tmp/claude-*.log`
+1. **Install**: `git clone https://github.com/flyingrobots/claude-auto-tee.git && cd claude-auto-tee`
+2. **Configure**: Follow [Installation](#installation) steps above
+3. **Use**: Run any bash command with pipes in Claude Code: `ls -la | head -5`
+4. **Access**: Full output automatically saved to `/tmp/claude-*.log`
 
-No installation scripts, no dependencies, no complexity.
+✅ **Zero dependencies** • ✅ **Universal compatibility** • ✅ **Instant setup**
+
+## System Requirements
+
+| Platform | Requirements |
+|----------|-------------|
+| **macOS** | macOS 10.12+ with bash 3.0+ |
+| **Linux** | Any distribution with bash 3.0+ |
+| **Windows** | WSL 1/2 with Ubuntu/Debian/etc |
+| **Claude Code** | Latest version with hook support |
+| **Disk Space** | ~50KB for hook + temp file space |
+| **Permissions** | Read/write access to temp directory |
 
 ## Philosophy
 
