@@ -53,24 +53,24 @@ The longest dependency chain is **8 levels deep**:
 
 #### Day 1 Morning (4 hours)
 **Root Research Tasks - Independent Execution**
-- [ ] [P1.T001](https://github.com/flyingrobots/claude-auto-tee/issues/1) - Research platform-specific temp directory conventions (2h)
-- [ ] [P1.T017](https://github.com/flyingrobots/claude-auto-tee/issues/19) - Check available disk space before creating temp files (1.5h)
-- [ ] [P1.T021](https://github.com/flyingrobots/claude-auto-tee/issues/23) - Add optional verbose mode showing resource usage (0.5h)
+- [x] [P1.T001](https://github.com/flyingrobots/claude-auto-tee/issues/1) - Research platform-specific temp directory conventions (2h)
+- [x] [P1.T017](https://github.com/flyingrobots/claude-auto-tee/issues/19) - Check available disk space before creating temp files (1.5h)
+- [x] [P1.T021](https://github.com/flyingrobots/claude-auto-tee/issues/23) - Add optional verbose mode showing resource usage (0.5h)
 
 #### Day 1 Afternoon (4 hours)  
 **Infrastructure Setup Tasks**
-- [ ] [P1.T013](https://github.com/flyingrobots/claude-auto-tee/issues/5) - Implement cleanup on successful completion (2h)
-- [ ] [P1.T024](https://github.com/flyingrobots/claude-auto-tee/issues/7) - Create comprehensive error codes/categories (2h)
+- [x] [P1.T013](https://github.com/flyingrobots/claude-auto-tee/issues/5) - Implement cleanup on successful completion (2h)
+- [x] [P1.T024](https://github.com/flyingrobots/claude-auto-tee/issues/7) - Create comprehensive error codes/categories (2h)
 
 #### Day 2 Morning (4 hours)
 **Advanced Research & Planning**
-- [ ] [P1.T028](https://github.com/flyingrobots/claude-auto-tee/issues/29) - Define graceful degradation for common failures (1.5h)
+- [x] [P1.T028](https://github.com/flyingrobots/claude-auto-tee/issues/29) - Define graceful degradation for common failures (1.5h)
 - [x] [P1.T037](https://github.com/flyingrobots/claude-auto-tee/issues/8) - Update README.md with clear installation instructions (1.5h)
-- [ ] [P1.T041](https://github.com/flyingrobots/claude-auto-tee/issues/41) - Common error scenarios and solutions (1h)
+- [x] [P1.T041](https://github.com/flyingrobots/claude-auto-tee/issues/41) - Common error scenarios and solutions (1h)
 
 #### Day 2 Afternoon (4 hours)
 **Specialized Infrastructure**
-- [ ] [P1.T049](https://github.com/flyingrobots/claude-auto-tee/issues/49) - Expand existing test suite for new features (2h)
+- [x] [P1.T049](https://github.com/flyingrobots/claude-auto-tee/issues/49) - Expand existing test suite for new features (2h)
 - [x] [P1.T053](https://github.com/flyingrobots/claude-auto-tee/issues/53) - Create comprehensive manual test checklist (1.5h)
 - [ ] [P1.T057](https://github.com/flyingrobots/claude-auto-tee/issues/57) - Identify beta testing group (0.5h)
 
