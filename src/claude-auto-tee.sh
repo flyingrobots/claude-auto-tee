@@ -2,6 +2,92 @@
 # Claude Auto-Tee Hook - Minimal Implementation
 # Automatically injects tee for pipe commands to save full output
 
+set -euo pipefail
+IFS=$'\n\t'
+
+# Source disk space checking functions
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/disk-space-check.sh"
+
+# Get temp directory with fallback hierarchy based on research (P1.T001)
+get_temp_dir() {
+    local dir
+    
+    # Test candidates in priority order
+    # 1. Environment variables (cross-platform)
+    if [[ -n "${TMPDIR:-}" ]]; then
+        dir="${TMPDIR%/}"  # Remove trailing slash
+        if [[ -d "$dir" && -w "$dir" && -x "$dir" ]]; then
+            echo "$dir"
+            return 0
+        fi
+    fi
+    
+    if [[ -n "${TMP:-}" ]]; then
+        dir="${TMP%/}"
+        if [[ -d "$dir" && -w "$dir" && -x "$dir" ]]; then
+            echo "$dir"
+            return 0
+        fi
+    fi
+    
+    if [[ -n "${TEMP:-}" ]]; then
+        dir="${TEMP%/}"
+        if [[ -d "$dir" && -w "$dir" && -x "$dir" ]]; then
+            echo "$dir"
+            return 0
+        fi
+    fi
+    
+    # 2. Platform-specific defaults
+    case "$(uname -s)" in
+        Darwin*)
+            for dir in "/private/var/tmp" "/tmp"; do
+                if [[ -d "$dir" && -w "$dir" && -x "$dir" ]]; then
+                    echo "$dir"
+                    return 0
+                fi
+            done
+            ;;
+        Linux*)
+            for dir in "/var/tmp" "/tmp"; do
+                if [[ -d "$dir" && -w "$dir" && -x "$dir" ]]; then
+                    echo "$dir"
+                    return 0
+                fi
+            done
+            ;;
+        CYGWIN*|MINGW*|MSYS*)
+            for dir in "/tmp" "/var/tmp"; do
+                if [[ -d "$dir" && -w "$dir" && -x "$dir" ]]; then
+                    echo "$dir"
+                    return 0
+                fi
+            done
+            ;;
+        *)
+            for dir in "/var/tmp" "/tmp"; do
+                if [[ -d "$dir" && -w "$dir" && -x "$dir" ]]; then
+                    echo "$dir"
+                    return 0
+                fi
+            done
+            ;;
+    esac
+    
+    # 3. Last resort fallbacks
+    for dir in "${HOME}/.tmp" "${HOME}/tmp" "."; do
+        if [[ -d "$dir" && -w "$dir" && -x "$dir" ]]; then
+            echo "$dir"
+            return 0
+        fi
+    done
+    
+    # No suitable directory found
+    echo "Error: No writable temporary directory found" >&2
+    return 1
+}
+
 # Read Claude Code hook input
 input=$(cat)
 
@@ -17,8 +103,23 @@ if echo "$command" | grep -q " | "; then
         exit 0
     fi
     # Process - has pipe but no tee
+    # Get suitable temp directory
+    temp_dir=$(get_temp_dir)
+    if [[ $? -ne 0 ]]; then
+        # Fallback: pass through unchanged if no temp directory available
+        echo "$input"
+        exit 0
+    fi
+    
+    # Check disk space before proceeding (P1.T017)
+    if ! check_temp_space_for_command "$temp_dir" "$command"; then
+        # Insufficient space: pass through unchanged to avoid failures
+        echo "$input"
+        exit 0
+    fi
+    
     # Generate unique temp file
-    temp_file="/tmp/claude-$(date +%s%N | cut -b1-13).log"
+    temp_file="${temp_dir}/claude-$(date +%s%N | cut -b1-13).log"
     
     # Find first pipe and split command
     before_pipe="${command%% | *}"

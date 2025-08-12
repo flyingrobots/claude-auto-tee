@@ -117,7 +117,7 @@ async function testPipelineInjection() {
   
   assert(cmd.includes('| tee'), 'Should inject tee into pipeline');
   assert(cmd.includes('| tail -10'), 'Should preserve existing tail');
-  assert(cmd.includes('/tmp/claude-'), 'Should use temp file');
+  assert(cmd.includes('claude-') && cmd.includes('.log'), 'Should use temp file with claude prefix');
   assert(cmd.includes('Full output saved to:'), 'Should show temp file location');
 }
 
