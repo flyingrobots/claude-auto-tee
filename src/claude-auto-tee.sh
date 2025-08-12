@@ -23,6 +23,12 @@ readonly MAX_TEMP_FILE_SIZE="${CLAUDE_AUTO_TEE_MAX_SIZE:-$DEFAULT_MAX_TEMP_FILE_
 readonly CLEANUP_AGE_HOURS="${CLAUDE_AUTO_TEE_CLEANUP_AGE_HOURS:-48}"   # Default: 48 hours
 readonly ENABLE_AGE_CLEANUP="${CLAUDE_AUTO_TEE_ENABLE_AGE_CLEANUP:-true}"
 
+# Resource usage warning configuration (P1.T022)
+readonly ENABLE_RESOURCE_WARNINGS="${CLAUDE_AUTO_TEE_ENABLE_RESOURCE_WARNINGS:-true}"
+readonly SPACE_WARNING_THRESHOLD_MB="${CLAUDE_AUTO_TEE_SPACE_WARNING_THRESHOLD_MB:-500}" # Warn if less than 500MB
+readonly TEMP_FILE_WARNING_SIZE_MB="${CLAUDE_AUTO_TEE_TEMP_FILE_WARNING_SIZE_MB:-50}"     # Warn if temp file > 50MB
+readonly MAX_TEMP_FILES_WARNING="${CLAUDE_AUTO_TEE_MAX_TEMP_FILES_WARNING:-20}"           # Warn if > 20 temp files
+
 # Verbose logging function
 log_verbose() {
     if [[ "$VERBOSE_MODE" == "true" ]]; then
@@ -33,6 +39,75 @@ log_verbose() {
 # Check if verbose mode is enabled (for error reporting)
 is_verbose_mode() {
     [[ "$VERBOSE_MODE" == "true" ]]
+}
+
+# Resource usage warning functions (P1.T022)
+log_resource_warning() {
+    if [[ "$ENABLE_RESOURCE_WARNINGS" == "true" ]]; then
+        echo "[CLAUDE-AUTO-TEE] ⚠️  RESOURCE WARNING: $1" >&2
+    fi
+}
+
+check_disk_space_warnings() {
+    local temp_dir="$1"
+    
+    if [[ "$ENABLE_RESOURCE_WARNINGS" != "true" ]]; then
+        return 0
+    fi
+    
+    # Get available space in MB with timeout protection
+    local available_mb
+    if available_mb=$(timeout 5 check_disk_space "$temp_dir" 2>/dev/null); then
+        # Remove 'MB' suffix if present
+        available_mb="${available_mb%MB}"
+        
+        # Check if space is below warning threshold
+        if [[ "$available_mb" =~ ^[0-9]+$ ]] && [[ "$available_mb" -lt "$SPACE_WARNING_THRESHOLD_MB" ]]; then
+            log_resource_warning "Low disk space in temp directory: ${available_mb}MB available (threshold: ${SPACE_WARNING_THRESHOLD_MB}MB)"
+            log_resource_warning "Consider cleaning up temp files or using CLAUDE_AUTO_TEE_TEMP_DIR to specify alternative location"
+        fi
+    fi
+}
+
+check_temp_file_count_warnings() {
+    local temp_dir="$1"
+    
+    if [[ "$ENABLE_RESOURCE_WARNINGS" != "true" ]] || [[ ! -d "$temp_dir" ]]; then
+        return 0
+    fi
+    
+    # Count existing claude temp files with timeout and depth protection
+    local temp_file_count
+    if temp_file_count=$(timeout 3 find "$temp_dir" -maxdepth 1 -name "${TEMP_FILE_PREFIX}-*" -type f 2>/dev/null | wc -l 2>/dev/null); then
+        temp_file_count="${temp_file_count// /}" # Remove whitespace
+        
+        if [[ "$temp_file_count" =~ ^[0-9]+$ ]] && [[ "$temp_file_count" -gt "$MAX_TEMP_FILES_WARNING" ]]; then
+            log_resource_warning "High number of temp files detected: $temp_file_count files (threshold: $MAX_TEMP_FILES_WARNING)"
+            log_resource_warning "Consider enabling cleanup: export CLAUDE_AUTO_TEE_CLEANUP_ON_SUCCESS=true"
+            if [[ "$temp_file_count" -gt $((MAX_TEMP_FILES_WARNING * 2)) ]]; then
+                log_resource_warning "Very high temp file count! You may want to clean up manually: rm -f ${temp_dir}/${TEMP_FILE_PREFIX}-*"
+            fi
+        fi
+    else
+        # Fallback: skip the check if find takes too long
+        log_verbose "Temp file count check skipped (directory scan timeout)"
+    fi
+}
+
+monitor_resource_usage() {
+    local temp_dir="$1"
+    
+    if [[ "$ENABLE_RESOURCE_WARNINGS" != "true" ]]; then
+        return 0
+    fi
+    
+    log_verbose "Monitoring resource usage (warnings enabled)"
+    
+    # Check disk space warnings (with timeout protection)
+    check_disk_space_warnings "$temp_dir"
+    
+    # Check temp file count warnings (with timeout protection)
+    check_temp_file_count_warnings "$temp_dir"
 }
 
 # Create cleanup function script (P1.T013)
@@ -64,6 +139,7 @@ EOF
 
 # Initial verbose mode detection
 log_verbose "Verbose mode enabled (CLAUDE_AUTO_TEE_VERBOSE=$VERBOSE_MODE)"
+log_verbose "Resource usage warnings: $ENABLE_RESOURCE_WARNINGS (disk space threshold: ${SPACE_WARNING_THRESHOLD_MB}MB, file size threshold: ${TEMP_FILE_WARNING_SIZE_MB}MB)"
 
 # Global variables for cleanup on interruption (P1.T014)
 CURRENT_TEMP_FILE=""
@@ -779,6 +855,10 @@ if echo "$command" | grep -q " | "; then
     
     log_verbose "Generated temp file: $temp_file"
     log_verbose "Generated cleanup script: $cleanup_script"
+    
+    # Monitor resource usage and provide warnings (P1.T022)
+    monitor_resource_usage "$temp_dir"
+    
     clear_error_context
     
     # Find first pipe and split command

@@ -14,9 +14,10 @@
     "test:security": "bash test/graceful-degradation-test.sh && bash test/error-codes-test.sh",
     "test:edge-cases": "bash test/graceful-degradation-test.sh && bash test/integration-test.sh",
     "test:ci": "bash test/graceful-degradation-test.sh && node test/test.js && bash test/error-codes-test.sh",
-    "test:all": "bash test/graceful-degradation-test.sh && node test/test.js && bash test/error-codes-test.sh && bash test/resource-management-test.sh && bash test/integration-test.sh && bash test/test-path-handling.sh",
-    "test:cross-platform": "bash -c 'echo Testing on $(uname -s 2>/dev/null || echo Windows); bash test/graceful-degradation-test.sh && node test/test.js && bash test/error-codes-test.sh && bash test/resource-management-test.sh && bash test/integration-test.sh && bash test/test-path-handling.sh'",
-    "test:path-handling": "bash test/test-path-handling.sh"
+    "test:all": "bash test/graceful-degradation-test.sh && node test/test.js && bash test/error-codes-test.sh && bash test/resource-management-test.sh && bash test/integration-test.sh && bash test/test-path-handling.sh && bash test/test-resource-warnings.sh",
+    "test:cross-platform": "bash -c 'echo Testing on $(uname -s 2>/dev/null || echo Windows); bash test/graceful-degradation-test.sh && node test/test.js && bash test/error-codes-test.sh && bash test/resource-management-test.sh && bash test/integration-test.sh && bash test/test-path-handling.sh && bash test/test-resource-warnings.sh'",
+    "test:path-handling": "bash test/test-path-handling.sh",
+    "test:resource-warnings": "bash test/test-resource-warnings.sh"
   },
   "repository": {
     "type": "git",
