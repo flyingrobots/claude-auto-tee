@@ -21,9 +21,18 @@ services:
     build: .
     volumes:
       - .:/app
-      - /app/node_modules
-    ports:
-      - "3000:3000"
     command: bash
     stdin_open: true
     tty: true
+    
+  # Test the bash script directly
+  claude-auto-tee-bash:
+    build: .
+    volumes:
+      - ./test-results:/tmp/test-results
+    command: >
+      bash -c "
+        echo 'Testing pure bash implementation...' &&
+        echo '{\"tool\":{\"name\":\"Bash\",\"input\":{\"command\":\"find . -name *.sh | head -5\"}},\"timeout\":null}' | src/claude-auto-tee.sh &&
+        echo 'Bash script test completed successfully!'
+      "

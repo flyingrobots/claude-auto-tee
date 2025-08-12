@@ -11,7 +11,7 @@ const path = require('path');
 const fs = require('fs');
 const assert = require('assert');
 
-const HOOK_PATH = path.join(__dirname, '../../src/hook.js');
+const HOOK_PATH = path.join(__dirname, '../../src/claude-auto-tee.sh');
 
 class CITestSuite {
   constructor() {
@@ -312,7 +312,7 @@ class CITestSuite {
     ];
 
     for (const input of problematicInputs) {
-      const child = spawn('node', [HOOK_PATH], { 
+      const child = spawn('bash', [HOOK_PATH], { 
         stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 5000
       });
@@ -443,7 +443,7 @@ class CITestSuite {
 
   async runHook(toolData) {
     return new Promise((resolve, reject) => {
-      const child = spawn('node', [HOOK_PATH], { 
+      const child = spawn('bash', [HOOK_PATH], { 
         stdio: ['pipe', 'pipe', 'pipe'],
         timeout: 10000 // 10 second timeout for CI
       });

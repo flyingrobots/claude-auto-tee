@@ -1,22 +1,16 @@
-FROM node:18-alpine
+FROM alpine:latest
 
-# Install bash and other utilities
-RUN apk add --no-cache bash curl git
+# Install bash, node.js for testing, and other utilities
+RUN apk add --no-cache bash nodejs npm curl git
 
 # Create app directory
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
-
-# Install dependencies
-RUN npm install
-
-# Copy source code
+# Copy source code (minimal - just the bash script and tests)
 COPY . .
 
-# Make scripts executable
-RUN chmod +x src/hook.js install.js test/test.js
+# Make the bash script executable
+RUN chmod +x src/claude-auto-tee.sh
 
 # Create a test user (non-root for safety)
 RUN addgroup -g 1001 -S testuser && \
@@ -29,4 +23,5 @@ USER testuser
 RUN mkdir -p /home/testuser/.claude
 RUN mkdir -p /app/.claude
 
+# Run tests (note: uses Node.js for test framework, but production tool is pure bash)
 CMD ["npm", "test"]
