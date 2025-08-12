@@ -213,8 +213,186 @@ check_temp_space_for_command() {
     fi
 }
 
+# Generate meaningful error message for space issues (P1.T019)
+generate_space_error_message() {
+    local error_code="$1"
+    local dir_path="$2"
+    local required_mb="${3:-}"
+    local command="${4:-}"
+    
+    local base_message=""
+    local suggestions=()
+    local available_info=""
+    
+    # Get current space information if possible
+    if command -v df >/dev/null 2>&1 && [[ -d "$dir_path" ]]; then
+        local df_output
+        if df_output=$(df -h "$dir_path" 2>/dev/null); then
+            local available_space
+            available_space=$(echo "$df_output" | awk 'NR==2 {print $4}')
+            available_info=" (${available_space} available)"
+        fi
+    fi
+    
+    # Generate specific message based on error code
+    case "$error_code" in
+        20) # ERR_INSUFFICIENT_SPACE
+            base_message="Insufficient disk space in ${dir_path}${available_info}"
+            if [[ -n "$required_mb" ]]; then
+                base_message+=". Need at least ${required_mb}MB for safe operation"
+            fi
+            suggestions=(
+                "Free up disk space: rm -f ${dir_path}/claude-*.log"
+                "Use alternative temp directory: export TMPDIR=/path/with/more/space"
+                "Clean system temp files: rm -rf \${TMPDIR:-/tmp}/*"
+                "Check disk usage: df -h ${dir_path}"
+            )
+            ;;
+        21) # ERR_DISK_FULL
+            base_message="Disk is completely full at ${dir_path}${available_info}"
+            suggestions=(
+                "Immediately free critical space: rm -f ${dir_path}/claude-*.log"
+                "Clean large temporary files: find ${dir_path} -name '*.tmp' -size +10M -delete"
+                "Move to different filesystem: export TMPDIR=/mnt/other/filesystem"
+                "Check what's using space: du -sh ${dir_path}/* | sort -hr"
+            )
+            ;;
+        22) # ERR_QUOTA_EXCEEDED
+            base_message="Disk quota exceeded for ${dir_path}${available_info}"
+            suggestions=(
+                "Clean your temporary files: rm -f ${dir_path}/claude-*.log"
+                "Use system temp directory: export TMPDIR=/tmp"
+                "Check quota usage: quota -u \$USER"
+                "Contact system administrator for quota increase"
+            )
+            ;;
+        23) # ERR_SPACE_CHECK_FAILED
+            base_message="Unable to determine disk space for ${dir_path}"
+            suggestions=(
+                "Verify directory exists and is accessible: ls -la ${dir_path}"
+                "Check filesystem health: fsck ${dir_path}"
+                "Try alternative temp location: export TMPDIR=/tmp"
+                "Check system tools availability: which df stat"
+            )
+            ;;
+        *)
+            base_message="Space-related error in ${dir_path}${available_info}"
+            suggestions=(
+                "Check available space: df -h ${dir_path}"
+                "Clean temporary files: rm -f ${dir_path}/claude-*.log"
+                "Use alternative temp directory: export TMPDIR=/alternative/path"
+            )
+            ;;
+    esac
+    
+    # Add command-specific suggestions
+    if [[ -n "$command" ]]; then
+        case "$command" in
+            *"build"*|*"compile"*|*"make"*)
+                suggestions+=("For build commands, consider using: export CLAUDE_AUTO_TEE_MAX_SIZE=52428800")
+                ;;
+            *"find"*|*"grep -r"*)
+                suggestions+=("For large searches, consider: command | head -1000")
+                ;;
+            *"npm "*|*"yarn "*)
+                suggestions+=("Clear package manager cache: npm cache clean --force")
+                ;;
+        esac
+    fi
+    
+    # Format the complete error message
+    echo "$base_message"
+    echo ""
+    echo "💡 Suggested solutions (try in order):"
+    local count=1
+    for suggestion in "${suggestions[@]}"; do
+        echo "   $count. $suggestion"
+        ((count++))
+    done
+    
+    # Add general tip
+    echo ""
+    echo "ℹ️  Tip: Use 'export CLAUDE_AUTO_TEE_VERBOSE=true' for detailed space checking info"
+}
+
+# Enhanced space error reporting function
+report_space_error() {
+    local error_code="$1"
+    local dir_path="$2"
+    local required_mb="${3:-}"
+    local command="${4:-}"
+    
+    # Generate detailed error message
+    local detailed_message
+    detailed_message=$(generate_space_error_message "$error_code" "$dir_path" "$required_mb" "$command")
+    
+    echo "❌ Space Issue Detected:" >&2
+    echo "$detailed_message" >&2
+}
+
+# Check if we have enough space and provide meaningful feedback
+check_space_with_detailed_errors() {
+    local dir_path="$1"
+    local command="$2"
+    local verbose="${3:-false}"
+    
+    # Estimate required space
+    local estimated_size
+    estimated_size=$(estimate_command_output_size "$command")
+    local estimated_mb=$((estimated_size / 1024 / 1024))
+    
+    if [[ "$verbose" == "true" ]]; then
+        echo "Estimated command output size: ${estimated_mb}MB" >&2
+    fi
+    
+    # Check basic directory existence and permissions
+    if [[ ! -d "$dir_path" ]]; then
+        report_space_error 23 "$dir_path" "" "$command"
+        return 23
+    fi
+    
+    if [[ ! -w "$dir_path" ]]; then
+        report_space_error 23 "$dir_path" "" "$command"
+        return 23  
+    fi
+    
+    # Check available space with detailed error reporting
+    local available_bytes
+    if available_bytes=$(get_space_with_df "$dir_path") && [[ -n "$available_bytes" ]] && [[ "$available_bytes" -gt 0 ]]; then
+        local available_mb=$((available_bytes / 1024 / 1024))
+        local required_space=$((estimated_size + 50 * 1024 * 1024))  # Add 50MB buffer
+        local required_mb=$((required_space / 1024 / 1024))
+        
+        if [[ "$verbose" == "true" ]]; then
+            echo "Available space: ${available_mb}MB, Required: ${required_mb}MB" >&2
+        fi
+        
+        if [[ "$available_bytes" -lt "$required_space" ]]; then
+            if [[ "$available_mb" -lt 10 ]]; then
+                # Nearly full disk
+                report_space_error 21 "$dir_path" "$required_mb" "$command"
+                return 21
+            else
+                # Insufficient but not critical
+                report_space_error 20 "$dir_path" "$required_mb" "$command"
+                return 20
+            fi
+        fi
+        
+        # Space check passed
+        if [[ "$verbose" == "true" ]]; then
+            echo "✓ Sufficient space available (${available_mb}MB)" >&2
+        fi
+        return 0
+    else
+        # Unable to determine space
+        report_space_error 23 "$dir_path" "$estimated_mb" "$command"
+        return 23
+    fi
+}
+
 # Example usage and testing
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" ]]; then
     # Test the functions if script is run directly
     echo "Testing disk space checking functions..."
     
@@ -235,4 +413,13 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     echo "ls -la: $(estimate_command_output_size "ls -la") bytes"
     echo "npm run build: $(estimate_command_output_size "npm run build") bytes"
     echo "find . -name '*.js': $(estimate_command_output_size "find . -name '*.js'") bytes"
+    
+    # Test meaningful error message generation
+    echo ""
+    echo "Testing meaningful error messages:"
+    echo "--- ERR_INSUFFICIENT_SPACE ---"
+    generate_space_error_message 20 "/tmp" "100" "npm run build"
+    echo ""
+    echo "--- ERR_DISK_FULL ---"
+    generate_space_error_message 21 "/tmp" "" "find . -name '*.js'"
 fi

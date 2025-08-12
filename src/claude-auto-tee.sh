@@ -60,6 +60,49 @@ EOF
 # Initial verbose mode detection
 log_verbose "Verbose mode enabled (CLAUDE_AUTO_TEE_VERBOSE=$VERBOSE_MODE)"
 
+# Global variables for cleanup on interruption (P1.T014)
+CURRENT_TEMP_FILE=""
+CURRENT_CLEANUP_SCRIPT=""
+MONITOR_PID=""
+
+# Cleanup function for script interruption (P1.T014)
+cleanup_on_interruption() {
+    local signal="${1:-UNKNOWN}"
+    log_verbose "Received signal $signal - performing cleanup"
+    
+    # Kill background monitoring process if running (for future size limit monitoring)
+    if [[ -n "$MONITOR_PID" ]]; then
+        kill "$MONITOR_PID" 2>/dev/null || true
+        log_verbose "Killed background monitoring process (PID: $MONITOR_PID)"
+    fi
+    
+    # Clean up temp files
+    if [[ -n "$CURRENT_TEMP_FILE" ]] && [[ -f "$CURRENT_TEMP_FILE" ]]; then
+        rm -f "$CURRENT_TEMP_FILE" 2>/dev/null || true
+        log_verbose "Cleaned up temp file: $CURRENT_TEMP_FILE"
+    fi
+    
+    # Clean up cleanup script
+    if [[ -n "$CURRENT_CLEANUP_SCRIPT" ]] && [[ -f "$CURRENT_CLEANUP_SCRIPT" ]]; then
+        rm -f "$CURRENT_CLEANUP_SCRIPT" 2>/dev/null || true
+        log_verbose "Cleaned up cleanup script: $CURRENT_CLEANUP_SCRIPT"
+    fi
+    
+    # Exit with appropriate code
+    if [[ "$signal" == "EXIT" ]]; then
+        exit 0
+    else
+        exit 130  # Standard exit code for script interrupted by Ctrl+C
+    fi
+}
+
+# Set up signal handlers for interruption cleanup (P1.T014)
+trap 'cleanup_on_interruption INT' INT     # Ctrl+C
+trap 'cleanup_on_interruption TERM' TERM  # Termination signal
+trap 'cleanup_on_interruption EXIT' EXIT  # Normal exit
+trap 'cleanup_on_interruption HUP' HUP    # Hangup signal
+log_verbose "Signal handlers installed for cleanup on interruption"
+
 # Enhanced environment detection functions (P1.T004)
 detect_container_environment() {
     # Container/sandbox detection
@@ -412,14 +455,33 @@ if echo "$command" | grep -q " | "; then
     clear_error_context
     log_verbose "Selected temp directory: $temp_dir"
     
-    # Check disk space before proceeding (P1.T017)
+    # Check disk space before proceeding (P1.T017, P1.T019)
     set_error_context "Checking disk space for command execution"
     log_verbose "Checking disk space for command execution..."
-    if ! check_temp_space_for_command "$temp_dir" "$command" "$VERBOSE_MODE"; then
+    
+    # Use enhanced space checking with meaningful error messages (P1.T019)
+    space_check_result=""
+    if ! check_space_with_detailed_errors "$temp_dir" "$command" "$VERBOSE_MODE"; then
+        space_check_result=$?
         clear_error_context
-        log_verbose "Insufficient disk space - passing through unchanged"
-        # Graceful degradation: pass through unchanged to avoid failures
-        report_warning $ERR_INSUFFICIENT_SPACE "Falling back to pass-through mode due to insufficient space"
+        log_verbose "Space check failed with code $space_check_result - enabling graceful degradation"
+        
+        # Different handling based on space error severity
+        case $space_check_result in
+            21) # ERR_DISK_FULL - critical, must fallback
+                report_warning $ERR_DISK_FULL "Critical disk space issue - falling back to pass-through mode"
+                ;;
+            22) # ERR_QUOTA_EXCEEDED - user issue, fallback recommended
+                report_warning $ERR_QUOTA_EXCEEDED "Quota exceeded - falling back to pass-through mode"
+                ;;
+            20) # ERR_INSUFFICIENT_SPACE - warning, but can try to continue
+                report_warning $ERR_INSUFFICIENT_SPACE "Limited disk space - falling back to pass-through mode"
+                ;;
+            *) # Other space-related issues
+                report_warning $ERR_SPACE_CHECK_FAILED "Space check failed - falling back to pass-through mode"
+                ;;
+        esac
+        
         echo "$input"
         exit 0
     fi
@@ -444,6 +506,9 @@ if echo "$command" | grep -q " | "; then
     set_error_context "Creating temp file and cleanup script"
     temp_file="${temp_dir}/${TEMP_FILE_PREFIX}-$(date +%s%N | cut -b1-13).log"
     
+    # Set global variables for interruption cleanup (P1.T014)
+    CURRENT_TEMP_FILE="$temp_file"
+    
     # Validate temp file path
     if [[ ! -w "$temp_dir" ]]; then
         report_warning $ERR_TEMP_DIR_NOT_WRITABLE "Temp directory not writable: $temp_dir"
@@ -453,6 +518,7 @@ if echo "$command" | grep -q " | "; then
     
     # Create cleanup script
     cleanup_script=$(create_cleanup_function "$temp_dir")
+    CURRENT_CLEANUP_SCRIPT="$cleanup_script"
     if [[ -z "$cleanup_script" ]] || [[ ! -f "$cleanup_script" ]]; then
         report_warning $ERR_TEMP_FILE_CREATE_FAILED "Failed to create cleanup script, proceeding without cleanup"
         cleanup_script=""
