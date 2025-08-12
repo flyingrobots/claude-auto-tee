@@ -11,6 +11,7 @@ Claude Auto-Tee supports several environment variables that allow users to overr
 ### Core Functionality Overrides
 
 #### `CLAUDE_AUTO_TEE_TEMP_DIR`
+
 **Purpose**: Override the temp directory detection chain  
 **Default**: Uses platform-specific temp directory hierarchy  
 **Example**: `export CLAUDE_AUTO_TEE_TEMP_DIR=/custom/temp/path`
@@ -20,6 +21,7 @@ Forces claude-auto-tee to use a specific directory for temp files, bypassing the
 **Priority**: Highest (checked before TMPDIR, TMP, TEMP)
 
 #### `CLAUDE_AUTO_TEE_VERBOSE`
+
 **Purpose**: Enable verbose logging output  
 **Default**: `false`  
 **Values**: `true`, `false`  
@@ -28,6 +30,7 @@ Forces claude-auto-tee to use a specific directory for temp files, bypassing the
 When enabled, outputs detailed logging information to stderr showing temp directory detection, disk space checks, and command processing steps.
 
 #### `CLAUDE_AUTO_TEE_CLEANUP_ON_SUCCESS`
+
 **Purpose**: Control automatic cleanup of temp files on successful command completion  
 **Default**: `true`  
 **Values**: `true`, `false`  
@@ -38,6 +41,7 @@ When `true`, successfully completed commands will automatically clean up their t
 ### File Management Overrides
 
 #### `CLAUDE_AUTO_TEE_TEMP_PREFIX`
+
 **Purpose**: Customize the prefix used for temp file names  
 **Default**: `claude`  
 **Example**: `export CLAUDE_AUTO_TEE_TEMP_PREFIX=mytool`
@@ -45,6 +49,7 @@ When `true`, successfully completed commands will automatically clean up their t
 Changes the temp file naming pattern from `claude-{timestamp}.log` to `{prefix}-{timestamp}.log`.
 
 #### `CLAUDE_AUTO_TEE_MAX_SIZE`
+
 **Purpose**: Set maximum size limit for temp files  
 **Default**: 104857600 (100MB)  
 **Format**: Size in bytes (numeric)  
@@ -76,6 +81,7 @@ The environment variables are processed in the following order:
 ## Usage Examples
 
 ### Basic Verbose Mode
+
 ```bash
 # Enable verbose logging for debugging
 export CLAUDE_AUTO_TEE_VERBOSE=true
@@ -83,6 +89,7 @@ claude-code  # All subsequent commands will show detailed logging
 ```
 
 ### Custom Temp Directory
+
 ```bash
 # Use a specific temp directory (must exist and be writable)
 export CLAUDE_AUTO_TEE_TEMP_DIR=/mnt/fast-storage/temp
@@ -90,6 +97,7 @@ claude-code  # Temp files will be created in /mnt/fast-storage/temp
 ```
 
 ### Preserve All Temp Files
+
 ```bash
 # Disable cleanup to preserve all temp files for analysis
 export CLAUDE_AUTO_TEE_CLEANUP_ON_SUCCESS=false
@@ -97,6 +105,7 @@ claude-code  # All temp files will be preserved after command completion
 ```
 
 ### Custom File Prefix
+
 ```bash
 # Use custom prefix for easier temp file identification
 export CLAUDE_AUTO_TEE_TEMP_PREFIX=debug
@@ -104,6 +113,7 @@ claude-code  # Temp files will be named debug-{timestamp}.log
 ```
 
 ### Combined Configuration
+
 ```bash
 # Set multiple overrides for a debugging session
 export CLAUDE_AUTO_TEE_VERBOSE=true
@@ -117,6 +127,7 @@ claude-code  # Verbose mode, no cleanup, custom prefix, custom directory
 ## Shell Integration
 
 ### Bash/Zsh Profile Setup
+
 Add to `~/.bashrc`, `~/.zshrc`, or equivalent:
 
 ```bash
@@ -130,6 +141,7 @@ export CLAUDE_AUTO_TEE_TEMP_PREFIX=claude
 ```
 
 ### Session-Specific Overrides
+
 ```bash
 # Temporary override for current session only
 CLAUDE_AUTO_TEE_VERBOSE=true claude-code
@@ -142,6 +154,7 @@ unset CLAUDE_AUTO_TEE_VERBOSE  # Reset to default
 ```
 
 ### Project-Specific Configuration
+
 Create a `.env` file in your project directory:
 
 ```bash
@@ -152,6 +165,7 @@ CLAUDE_AUTO_TEE_TEMP_PREFIX=project
 ```
 
 Then source it before running Claude Code:
+
 ```bash
 source .env && claude-code
 ```
@@ -209,6 +223,7 @@ If an environment variable contains an invalid value:
 **Solution**: Use numeric values only (bytes): `1048576` not `1MB`
 
 ### Debugging Environment Variables
+
 ```bash
 # Check current environment variable values
 env | grep CLAUDE_AUTO_TEE
