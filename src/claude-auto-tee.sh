@@ -763,7 +763,11 @@ validate_command_security() {
     fi
     
     # 2. Security checks - reject dangerous patterns
-    if echo "$cmd" | grep -qE '[;&|]{2,}|[;&]|\$\(|\`|\\'; then
+    # Allow 2>&1 and 1>&2 redirections but block dangerous operators
+    # First remove safe redirections, then check for dangerous patterns
+    local safe_cmd
+    safe_cmd=$(echo "$cmd" | sed 's/[12]>&[12]//g')
+    if echo "$safe_cmd" | grep -qE '&|;|\$\(|\`|\\|&&|\|\|'; then
         log_verbose "Command contains potentially dangerous operators or expansions"
         return 1
     fi
@@ -1022,8 +1026,9 @@ if [[ "$pipe_count" -gt 0 ]]; then
         exit 0
     fi
     
-    before_pipe="${command:0:$((pipe_position-1))}"
-    after_pipe="${command:$((pipe_position+3))}"
+    # Extract parts around the pipe (pipe_position points to |, we want to exclude " | ")
+    before_pipe="${command:0:$((pipe_position-1))}"  # Up to space before |
+    after_pipe="${command:$((pipe_position+2))}"     # After | and space
     log_verbose "Split command - before pipe: $before_pipe"
     log_verbose "Split command - after pipe: $after_pipe"
     
