@@ -7,6 +7,11 @@ if [ -z "$ERR_NO_TEMP_DIR" ]; then
     source "$(dirname "${BASH_SOURCE[0]}")/error-codes.sh"
 fi
 
+# Degradation configuration constants
+readonly MIN_SPACE_BYTES=$((1024 * 1024))                   # 1MB minimum space requirement
+readonly MAX_COMMAND_LENGTH=10000                           # Maximum safe command length
+readonly TEMP_FILE_PREFIX=".claude-test-"                  # Prefix for temp test files
+
 # Degradation configuration
 CLAUDE_DEGRADATION_MODE=${CLAUDE_DEGRADATION_MODE:-auto}    # auto|strict|permissive
 CLAUDE_RETRY_ATTEMPTS=${CLAUDE_RETRY_ATTEMPTS:-3}           # number of retry attempts
@@ -15,13 +20,55 @@ CLAUDE_FAIL_FAST=${CLAUDE_FAIL_FAST:-false}                # override fail-safe 
 CLAUDE_METRICS_LOG=${CLAUDE_METRICS_LOG:-}                 # optional metrics logging
 
 # Global state
-declare -g ORIGINAL_INPUT=""
-declare -g DEGRADATION_ACTIVE=false
+ORIGINAL_INPUT=""
+DEGRADATION_ACTIVE="false"
+
+# Utility functions for compatibility
+verbose_log() {
+    if is_verbose_mode 2>/dev/null; then
+        echo "[VERBOSE] $1" >&2
+    fi
+}
+
+is_verbose_mode() {
+    [ "${CLAUDE_AUTO_TEE_VERBOSE:-0}" = "1" ]
+}
+
+# Mock functions for testing - these would be implemented elsewhere
+detect_temp_directory() {
+    local temp_candidates=("/tmp" "$HOME/tmp" "$HOME" ".")
+    for dir in "${temp_candidates[@]}"; do
+        if [ -d "$dir" ] && [ -w "$dir" ]; then
+            echo "$dir"
+            return 0
+        fi
+    done
+    return 1
+}
+
+get_available_space() {
+    local dir="$1"
+    if command -v df >/dev/null 2>&1; then
+        df -k "$dir" 2>/dev/null | tail -1 | awk '{print $4 * 1024}'
+    else
+        echo "1000000"  # 1MB fallback
+    fi
+}
+
+# Error context management functions
+set_error_context() {
+    ERROR_CONTEXT="$1"
+}
+
+clear_error_context() {
+    ERROR_CONTEXT=""
+}
 
 # Initialize degradation system
 initialize_degradation() {
     local original_input="$1"
     ORIGINAL_INPUT="$original_input"
+    DEGRADATION_ACTIVE="false"
     
     # Configure behavior based on mode
     configure_degradation_behavior
@@ -93,8 +140,9 @@ initiate_passthrough_mode() {
     local error_code="$1"
     local context="$2"  
     local original_input="$3"
+    local test_mode="${4:-false}"
     
-    DEGRADATION_ACTIVE=true
+    DEGRADATION_ACTIVE="true"
     
     # Log degradation event
     log_degradation_event "$error_code" "passthrough"
@@ -107,7 +155,11 @@ initiate_passthrough_mode() {
     
     # Pass through original input unchanged
     echo "$original_input"
-    exit 0
+    
+    # Exit unless in test mode
+    if [ "$test_mode" != "true" ]; then
+        exit 0
+    fi
 }
 
 # Recovery attempt for execution/output errors
@@ -170,9 +222,9 @@ attempt_alternative_temp_location() {
         # Skip if directory doesn't exist
         [ -d "$alt_dir" ] || continue
         
-        # Test write access
-        local test_file="$alt_dir/.claude-test-$$"
-        if touch "$test_file" 2>/dev/null; then
+        # Test write access with atomic temp file creation to avoid race conditions
+        local test_file
+        if test_file=$(mktemp "$alt_dir/${TEMP_FILE_PREFIX}XXXXXX" 2>/dev/null); then
             rm -f "$test_file" 2>/dev/null
             verbose_log "Alternative temp location found: $alt_dir"
             export CLAUDE_TEMP_DIR_OVERRIDE="$alt_dir"
@@ -189,14 +241,14 @@ attempt_minimal_space_mode() {
     verbose_log "Attempting minimal space mode"
     
     # Set very conservative space requirements
-    export CLAUDE_MIN_TEMP_SPACE=1048576  # 1MB minimum
-    export CLAUDE_SPACE_CHECK=warn        # Warn but proceed
+    export CLAUDE_MIN_TEMP_SPACE=$MIN_SPACE_BYTES  # Use configured minimum
+    export CLAUDE_SPACE_CHECK=warn                 # Warn but proceed
     
     # Try with reduced requirements
     local temp_dir="${CLAUDE_TEMP_DIR_OVERRIDE:-$(detect_temp_directory 2>/dev/null)}"
     if [ -n "$temp_dir" ]; then
         local available=$(get_available_space "$temp_dir" 2>/dev/null || echo 0)
-        if [ "$available" -gt 1048576 ]; then
+        if [ "$available" -gt $MIN_SPACE_BYTES ]; then
             verbose_log "Minimal space mode activated with ${available} bytes available"
             return 0
         fi
@@ -210,15 +262,27 @@ attempt_minimal_space_mode() {
 attempt_simple_execution() {
     verbose_log "Attempting simple execution without tee enhancement"
     
-    # Extract original command and execute directly
+    # Extract original command with proper JSON parsing
     local original_command
-    original_command=$(echo "$ORIGINAL_INPUT" | sed -n 's/.*"command":"\([^"]*\(\\"[^"]*\)*\)".*/\1/p' | sed 's/\\"/"/g')
+    if command -v jq >/dev/null 2>&1; then
+        original_command=$(echo "$ORIGINAL_INPUT" | jq -r '.tool.input.command // empty' 2>/dev/null)
+    else
+        # Fallback regex with validation
+        original_command=$(echo "$ORIGINAL_INPUT" | sed -n 's/.*"command":"\([^"]*\(\\"[^"]*\)*\)".*/\1/p' | sed 's/\\"/"/g')
+    fi
     
-    if [ -n "$original_command" ]; then
+    # Validate extracted command is reasonable (basic security check)
+    if [ -n "$original_command" ] && [ ${#original_command} -lt $MAX_COMMAND_LENGTH ]; then
+        # Additional security: validate command doesn't contain dangerous patterns
+        if echo "$original_command" | grep -qE '(;|\||&|\$\(|`).*\b(rm|dd|mkfs|format)\b'; then
+            verbose_log "Command contains potentially dangerous patterns, refusing simple execution"
+            return 1
+        fi
+        
         verbose_log "Executing original command without tee: $original_command"
         
-        # Execute the original command directly
-        eval "$original_command"
+        # Execute the original command with bash -c for better security than eval
+        bash -c "$original_command"
         local exit_code=$?
         
         # Show success message
@@ -231,7 +295,7 @@ attempt_simple_execution() {
         exit $exit_code
     fi
     
-    verbose_log "Could not extract original command for simple execution"
+    verbose_log "Could not extract or validate original command for simple execution"
     return 1
 }
 
@@ -242,7 +306,10 @@ smart_retry() {
     local initial_delay="${CLAUDE_RETRY_DELAY:-1}"
     
     local attempt=1
-    local delay=$initial_delay
+    # Ensure delay is an integer for arithmetic operations
+    local delay
+    delay=$(echo "$initial_delay" | cut -d. -f1)
+    [ "$delay" -lt 1 ] && delay=1
     
     while [ $attempt -le $max_attempts ]; do
         verbose_log "Retry attempt $attempt of $max_attempts: $operation"
@@ -255,7 +322,8 @@ smart_retry() {
         if [ $attempt -lt $max_attempts ]; then
             verbose_log "Attempt $attempt failed, waiting ${delay}s before retry"
             sleep $delay
-            delay=$(echo "$delay * 2" | bc 2>/dev/null || echo $((delay * 2)))
+            # Use arithmetic expansion for better compatibility
+            delay=$((delay * 2))
             attempt=$((attempt + 1))
         else
             break
@@ -356,7 +424,7 @@ cleanup_degradation() {
     fi
     
     clear_error_context 2>/dev/null || true
-    DEGRADATION_ACTIVE=false
+    DEGRADATION_ACTIVE="false"
 }
 
 # Utility function to test degradation behavior
