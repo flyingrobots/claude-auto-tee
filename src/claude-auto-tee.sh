@@ -57,16 +57,143 @@ EOF
 # Initial verbose mode detection
 log_verbose "Verbose mode enabled (CLAUDE_AUTO_TEE_VERBOSE=$VERBOSE_MODE)"
 
-# Get temp directory with fallback hierarchy based on research (P1.T001)
+# Enhanced environment detection functions (P1.T004)
+detect_container_environment() {
+    # Container/sandbox detection
+    if [[ -f /.dockerenv ]] || [[ -f /proc/1/cgroup ]] && grep -q docker /proc/1/cgroup 2>/dev/null; then
+        log_verbose "Docker container environment detected"
+        return 0
+    fi
+    
+    # Check for other container indicators
+    if [[ -n "${container:-}" ]] || [[ -n "${CONTAINER:-}" ]]; then
+        log_verbose "Container environment detected via environment variables"
+        return 0
+    fi
+    
+    # Check for common container/sandbox patterns
+    if [[ "$(id -u 2>/dev/null || echo 0)" == "0" ]] && [[ ! -w "/" ]]; then
+        log_verbose "Read-only root filesystem detected (likely containerized)"
+        return 0
+    fi
+    
+    return 1
+}
+
+detect_readonly_filesystem() {
+    local test_dir="$1"
+    
+    if [[ ! -d "$test_dir" ]]; then
+        return 1  # Directory doesn't exist, not our concern here
+    fi
+    
+    # Test if filesystem is read-only
+    local test_file="${test_dir}/.claude-write-test-$$"
+    if ! touch "$test_file" 2>/dev/null; then
+        log_verbose "Directory $test_dir appears to be on read-only filesystem"
+        return 0
+    fi
+    
+    # Clean up test file
+    rm -f "$test_file" 2>/dev/null || true
+    return 1
+}
+
+attempt_directory_creation() {
+    local dir="$1"
+    
+    # Don't try to create system directories that should already exist
+    if [[ "$dir" == "/tmp" ]] || [[ "$dir" == "/var/tmp" ]] || [[ "$dir" == "/private/var/tmp" ]]; then
+        return 1
+    fi
+    
+    # Don't try to create paths that look dangerous (avoid root filesystem modifications)
+    if [[ "$dir" == "/" ]] || [[ "$dir" == "/usr"* ]] || [[ "$dir" == "/etc"* ]] || [[ "$dir" == "/bin"* ]] || [[ "$dir" == "/sbin"* ]]; then
+        return 1
+    fi
+    
+    # Allow creation for user-controlled paths and reasonable temp paths
+    if [[ "$dir" == "${HOME}/"* ]] || [[ "$dir" == "."* ]] || [[ "$dir" == "/tmp/"* ]] || [[ "$dir" == "/var/tmp/"* ]]; then
+        log_verbose "Attempting to create missing directory: $dir"
+        if mkdir -p "$dir" 2>/dev/null; then
+            log_verbose "Successfully created directory: $dir"
+            return 0
+        fi
+        log_verbose "Failed to create directory: $dir"
+    else
+        log_verbose "Directory path not suitable for creation: $dir"
+    fi
+    
+    return 1
+}
+
+test_temp_directory_suitability() {
+    local dir="$1"
+    local context="${2:-unknown}"
+    
+    # Basic existence check
+    if [[ ! -d "$dir" ]]; then
+        log_verbose "Directory does not exist: $dir (context: $context)"
+        return 1
+    fi
+    
+    # Permission checks
+    if [[ ! -w "$dir" ]]; then
+        if detect_readonly_filesystem "$dir"; then
+            log_verbose "Directory $dir is on read-only filesystem (context: $context)"
+            return 1
+        fi
+        log_verbose "Directory not writable: $dir (context: $context)"
+        return 1
+    fi
+    
+    if [[ ! -x "$dir" ]]; then
+        log_verbose "Directory not executable: $dir (context: $context)"
+        return 1
+    fi
+    
+    # Test actual file creation
+    local test_file="${dir}/.claude-temp-test-$$-$RANDOM"
+    if ! touch "$test_file" 2>/dev/null; then
+        log_verbose "Cannot create test file in directory: $dir (context: $context)"
+        return 1
+    fi
+    
+    # Clean up test file
+    rm -f "$test_file" 2>/dev/null || true
+    
+    log_verbose "Directory is suitable: $dir (context: $context)"
+    return 0
+}
+
+# Get temp directory with fallback hierarchy and enhanced edge case handling (P1.T001, P1.T004)
 get_temp_dir() {
     local dir
+    local is_container=false
+    
+    # Detect environment characteristics
+    if detect_container_environment; then
+        is_container=true
+        log_verbose "Container/sandbox environment detected - using enhanced fallback strategies"
+    fi
     
     # Test candidates in priority order
     # 1. Claude Auto-Tee specific override (P1.T003)
     if [[ -n "${CLAUDE_AUTO_TEE_TEMP_DIR:-}" ]]; then
         dir="${CLAUDE_AUTO_TEE_TEMP_DIR%/}"  # Remove trailing slash
         log_verbose "Testing CLAUDE_AUTO_TEE_TEMP_DIR override: $dir"
-        if [[ -d "$dir" && -w "$dir" && -x "$dir" ]]; then
+        
+        # Try to create directory if it doesn't exist
+        if [[ ! -d "$dir" ]]; then
+            log_verbose "CLAUDE_AUTO_TEE_TEMP_DIR override does not exist: $dir"
+            if attempt_directory_creation "$dir"; then
+                log_verbose "Created CLAUDE_AUTO_TEE_TEMP_DIR override: $dir"
+            else
+                log_verbose "Failed to create CLAUDE_AUTO_TEE_TEMP_DIR override: $dir"
+            fi
+        fi
+        
+        if test_temp_directory_suitability "$dir" "CLAUDE_AUTO_TEE_TEMP_DIR override"; then
             log_verbose "Using CLAUDE_AUTO_TEE_TEMP_DIR override: $dir"
             echo "$dir"
             return 0
@@ -79,7 +206,7 @@ get_temp_dir() {
     if [[ -n "${TMPDIR:-}" ]]; then
         dir="${TMPDIR%/}"  # Remove trailing slash
         log_verbose "Testing TMPDIR: $dir"
-        if [[ -d "$dir" && -w "$dir" && -x "$dir" ]]; then
+        if test_temp_directory_suitability "$dir" "TMPDIR"; then
             log_verbose "Using TMPDIR: $dir"
             echo "$dir"
             return 0
@@ -90,7 +217,7 @@ get_temp_dir() {
     if [[ -n "${TMP:-}" ]]; then
         dir="${TMP%/}"
         log_verbose "Testing TMP: $dir"
-        if [[ -d "$dir" && -w "$dir" && -x "$dir" ]]; then
+        if test_temp_directory_suitability "$dir" "TMP"; then
             log_verbose "Using TMP: $dir"
             echo "$dir"
             return 0
@@ -101,7 +228,7 @@ get_temp_dir() {
     if [[ -n "${TEMP:-}" ]]; then
         dir="${TEMP%/}"
         log_verbose "Testing TEMP: $dir"
-        if [[ -d "$dir" && -w "$dir" && -x "$dir" ]]; then
+        if test_temp_directory_suitability "$dir" "TEMP"; then
             log_verbose "Using TEMP: $dir"
             echo "$dir"
             return 0
@@ -109,7 +236,7 @@ get_temp_dir() {
         log_verbose "TEMP not suitable: $dir"
     fi
     
-    # 3. Platform-specific defaults
+    # 3. Platform-specific defaults with enhanced edge case handling
     local platform
     platform="$(uname -s)"
     log_verbose "Platform detected: $platform"
@@ -119,7 +246,7 @@ get_temp_dir() {
             log_verbose "Using macOS temp directory fallbacks"
             for dir in "/private/var/tmp" "/tmp"; do
                 log_verbose "Testing platform fallback: $dir"
-                if [[ -d "$dir" && -w "$dir" && -x "$dir" ]]; then
+                if test_temp_directory_suitability "$dir" "macOS platform fallback"; then
                     log_verbose "Using platform fallback: $dir"
                     echo "$dir"
                     return 0
@@ -128,9 +255,16 @@ get_temp_dir() {
             ;;
         Linux*)
             log_verbose "Using Linux temp directory fallbacks"
-            for dir in "/var/tmp" "/tmp"; do
+            # In containers, try additional locations
+            local linux_candidates=("/var/tmp" "/tmp")
+            if [[ "$is_container" == "true" ]]; then
+                linux_candidates+=("/dev/shm" "/run/user/$(id -u 2>/dev/null || echo 0)")
+                log_verbose "Container detected - expanded Linux temp directory candidates"
+            fi
+            
+            for dir in "${linux_candidates[@]}"; do
                 log_verbose "Testing platform fallback: $dir"
-                if [[ -d "$dir" && -w "$dir" && -x "$dir" ]]; then
+                if test_temp_directory_suitability "$dir" "Linux platform fallback"; then
                     log_verbose "Using platform fallback: $dir"
                     echo "$dir"
                     return 0
@@ -141,7 +275,7 @@ get_temp_dir() {
             log_verbose "Using Windows/Cygwin temp directory fallbacks"
             for dir in "/tmp" "/var/tmp"; do
                 log_verbose "Testing platform fallback: $dir"
-                if [[ -d "$dir" && -w "$dir" && -x "$dir" ]]; then
+                if test_temp_directory_suitability "$dir" "Windows platform fallback"; then
                     log_verbose "Using platform fallback: $dir"
                     echo "$dir"
                     return 0
@@ -152,7 +286,7 @@ get_temp_dir() {
             log_verbose "Using generic Unix temp directory fallbacks"
             for dir in "/var/tmp" "/tmp"; do
                 log_verbose "Testing platform fallback: $dir"
-                if [[ -d "$dir" && -w "$dir" && -x "$dir" ]]; then
+                if test_temp_directory_suitability "$dir" "generic platform fallback"; then
                     log_verbose "Using platform fallback: $dir"
                     echo "$dir"
                     return 0
@@ -161,20 +295,57 @@ get_temp_dir() {
             ;;
     esac
     
-    # 4. Last resort fallbacks
+    # 4. Last resort fallbacks with creation attempts
     log_verbose "Trying last resort fallbacks"
-    for dir in "${HOME}/.tmp" "${HOME}/tmp" "."; do
+    
+    # Enhanced fallback list for different environments
+    local fallback_candidates=("${HOME}/.tmp" "${HOME}/tmp" ".")
+    
+    # In container environments, try additional locations
+    if [[ "$is_container" == "true" ]]; then
+        fallback_candidates+=("${HOME}/.cache/tmp" "/tmp/user-$(id -u 2>/dev/null || echo 0)")
+        log_verbose "Container detected - expanded last resort candidates"
+    fi
+    
+    for dir in "${fallback_candidates[@]}"; do
         log_verbose "Testing last resort: $dir"
-        if [[ -d "$dir" && -w "$dir" && -x "$dir" ]]; then
+        
+        # Try to create directory if it doesn't exist
+        if [[ ! -d "$dir" ]]; then
+            if attempt_directory_creation "$dir"; then
+                log_verbose "Created last resort directory: $dir"
+            fi
+        fi
+        
+        if test_temp_directory_suitability "$dir" "last resort fallback"; then
             log_verbose "Using last resort: $dir"
             echo "$dir"
             return 0
         fi
     done
     
-    # No suitable directory found
+    # Generate detailed error message with actionable guidance (P1.T004)
     log_verbose "No suitable temp directory found after exhaustive search"
-    report_error $ERR_NO_TEMP_DIR "No writable temporary directory found after exhaustive search" false
+    
+    # Build environment-specific guidance
+    local error_context="No writable temporary directory found after exhaustive search."
+    local guidance="\n\nTroubleshooting steps:\n"
+    guidance+="1. Check if you have write access to any temp directory:\n"
+    guidance+="   ls -ld /tmp /var/tmp \${HOME}/tmp 2>/dev/null\n\n"
+    
+    if [[ "$is_container" == "true" ]]; then
+        guidance+="2. Container environment detected. Try mounting a writable volume:\n"
+        guidance+="   docker run -v /host/tmp:/tmp your-image\n"
+        guidance+="   Or set CLAUDE_AUTO_TEE_TEMP_DIR to a writable path\n\n"
+    fi
+    
+    guidance+="3. Create a user temp directory:\n"
+    guidance+="   mkdir -p \${HOME}/tmp && export CLAUDE_AUTO_TEE_TEMP_DIR=\${HOME}/tmp\n\n"
+    guidance+="4. Check filesystem mount status:\n"
+    guidance+="   mount | grep -E '(tmp|ro)'\n\n"
+    guidance+="5. For read-only root filesystems, ensure a writable volume is mounted\n"
+    
+    report_error $ERR_NO_TEMP_DIR "${error_context}${guidance}" false
     return $ERR_NO_TEMP_DIR
 }
 
