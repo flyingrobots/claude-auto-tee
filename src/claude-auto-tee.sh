@@ -148,6 +148,7 @@ cleanup_orphaned_files() {
     
     # Use find if available, otherwise fall back to ls-based approach
     if command -v find >/dev/null 2>&1; then
+        log_verbose "Using find to locate orphaned files in: $temp_dir"
         # Find files matching our pattern that are older than cutoff time
         while IFS= read -r -d '' file; do
             if [[ -f "$file" ]]; then
@@ -181,7 +182,7 @@ cleanup_orphaned_files() {
                     log_verbose "File appears to be in use, skipping: $file"
                 fi
             fi
-        done < <(find "$temp_dir" -name "${TEMP_FILE_PREFIX}-*" -type f -print0 2>/dev/null || true)
+        done < <(timeout 10 find "$temp_dir" -maxdepth 2 -name "${TEMP_FILE_PREFIX}-*" -type f -print0 2>/dev/null || true)
     else
         # Fallback for systems without find
         log_verbose "find command not available, using fallback cleanup method"
@@ -342,7 +343,12 @@ run_startup_cleanup() {
 }
 
 # Run startup cleanup during initialization (P1.T015)
-run_startup_cleanup
+# Only run if explicitly enabled to avoid startup delays
+if [[ "$ENABLE_AGE_CLEANUP" == "true" ]]; then
+    timeout 30 run_startup_cleanup 2>/dev/null || {
+        log_verbose "Startup cleanup timed out or failed - continuing without cleanup"
+    }
+fi
 
 # Enhanced environment detection functions (P1.T004)
 detect_container_environment() {
