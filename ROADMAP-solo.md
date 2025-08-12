@@ -111,9 +111,9 @@ The longest dependency chain is **8 levels deep**:
 #### Day 4 Afternoon (4 hours)
 
 **Error Framework Dependencies**
-- [ ] [P1.T025](https://github.com/flyingrobots/claude-auto-tee/issues/26) - Implement structured error messages (1.5h)
+- [x] [P1.T025](https://github.com/flyingrobots/claude-auto-tee/issues/26) - Implement structured error messages (1.5h)
   - *Depends on: P1.T024*
-- [ ] [P1.T026](https://github.com/flyingrobots/claude-auto-tee/issues/27) - Add debug/verbose mode for troubleshooting (2.5h)
+- [x] [P1.T026](https://github.com/flyingrobots/claude-auto-tee/issues/27) - Add debug/verbose mode for troubleshooting (2.5h)
   - *Depends on: P1.T024*
 
 ### Days 5-7: Extended Implementation Phase
