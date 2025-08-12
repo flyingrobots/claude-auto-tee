@@ -51,6 +51,8 @@ Following structured expert debate with **unanimous 5-0 vote for radical simplif
 - **Bash** 3.0+ (pre-installed on macOS/Linux, available via WSL on Windows)
 - **Write access** to temp directory (`/tmp` on Unix, `$TEMP` on Windows)
 - **Git** (for installation)
+- **Minimum 100MB** free disk space in temp directory (configurable)
+- **tee** and **mktemp** commands (standard on all Unix systems)
 
 ### Quick Install (Recommended)
 
@@ -88,9 +90,75 @@ echo '{
 # Check hook is configured
 cat ~/.claude/settings.json
 
-# Test with Claude Code (should show tee injection)
-echo 'ls -la | head -5' | ./src/claude-auto-tee.sh
+# Test basic functionality (should show tee injection)
+echo '{"tool":{"name":"Bash","input":{"command":"ls -la | head -5"}},"timeout":null}' | ./src/claude-auto-tee.sh
+
+# Test with verbose mode enabled
+CLAUDE_AUTO_TEE_VERBOSE=true echo '{"tool":{"name":"Bash","input":{"command":"echo test | head -1"}},"timeout":null}' | ./src/claude-auto-tee.sh
 ```
+
+## Configuration
+
+### Environment Variables
+
+Claude Auto-Tee supports several environment variables for customization:
+
+#### `CLAUDE_AUTO_TEE_VERBOSE`
+**Purpose:** Enable detailed logging for debugging and monitoring  
+**Values:** `true` or `false` (default: `false`)  
+**Usage:**
+```bash
+# Enable verbose mode globally
+export CLAUDE_AUTO_TEE_VERBOSE=true
+
+# Enable for single session
+CLAUDE_AUTO_TEE_VERBOSE=true claude
+```
+**Output:** Provides detailed logging including:
+- Temp directory selection process
+- Disk space checking results  
+- Command parsing and modification
+- Error categorization and severity
+- Cleanup operations
+
+#### `TMPDIR`, `TMP`, `TEMP`
+**Purpose:** Override default temporary directory location  
+**Priority Order:** `$TMPDIR` → `$TMP` → `$TEMP` → platform defaults  
+**Usage:**
+```bash
+# Use custom temp directory
+export TMPDIR="/path/to/custom/temp"
+
+# Platform-specific examples
+export TMPDIR="/var/tmp"           # Linux persistent temp
+export TMPDIR="~/tmp"              # User directory fallback
+export TEMP="C:\\Users\\user\\temp"   # Windows custom temp
+```
+
+### Advanced Features
+
+#### Automatic Cleanup
+- **Success:** Temp files are automatically removed after successful command completion
+- **Failure:** Temp files are preserved for debugging (with notification)
+- **Manual cleanup:** Use `rm -f /tmp/claude-*.log` or similar
+
+#### Error Handling
+- **42 error codes** across 10 categories for precise troubleshooting
+- **Severity levels:** Info, Warning, Error, Fatal
+- **Graceful degradation:** Falls back to pass-through mode on failures
+- **Context tracking:** Hierarchical error context for better debugging
+
+#### Cross-Platform Support
+- **macOS:** Uses `$TMPDIR` (secure user-specific temp)
+- **Linux:** Supports `/tmp`, `/var/tmp`, custom locations
+- **Windows WSL:** Full compatibility with WSL filesystem
+- **Fallback hierarchy:** 7-level fallback system for maximum compatibility
+
+#### Resource Management
+- **Disk space checking:** Prevents failures due to insufficient space
+- **Size estimation:** Intelligent estimation based on command type
+- **Quota awareness:** Respects system and user disk quotas
+- **Cleanup on interruption:** Handles script interruption gracefully
 
 ### Alternative Installation Methods
 
@@ -167,35 +235,152 @@ git clone https://github.com/flyingrobots/claude-auto-tee.git
 
 ### Verification
 
-**Test the installation:**
+**Test the installation step by step:**
 
 ```bash
-# 1. Verify hook responds
-echo '{"tool":{"name":"Bash","input":{"command":"echo test | head -1"}},"timeout":null}' | ~/.claude/hooks/claude-auto-tee.sh
+# 1. Test basic functionality
+echo '{"tool":{"name":"Bash","input":{"command":"echo test | head -1"}},"timeout":null}' | ./src/claude-auto-tee.sh
 
-# Expected output: JSON with tee injection
-# {"tool":{"name":"Bash","input":{"command":"echo test 2>&1 | tee \"/tmp/claude-....log\" | head -1 ; echo \"Full output saved to: /tmp/claude-....log\""}},"timeout":null}
+# Expected: JSON with tee injection and cleanup logic
+# Output includes: source cleanup script, conditional cleanup, preserved files on failure
 
-# 2. Test in Claude Code
-# Run any command with a pipe, e.g.: ls -la | head -5
-# Should see: "Full output saved to: /tmp/claude-xyz.log"
+# 2. Test verbose mode
+CLAUDE_AUTO_TEE_VERBOSE=true echo '{"tool":{"name":"Bash","input":{"command":"ls -la | head -3"}},"timeout":null}' | ./src/claude-auto-tee.sh
 
-# 3. Check temp file was created
-ls -la /tmp/claude-*.log
+# Expected verbose output:
+# [CLAUDE-AUTO-TEE] Verbose mode enabled
+# [CLAUDE-AUTO-TEE] Pipe command detected: ls -la | head -3
+# [CLAUDE-AUTO-TEE] Detecting suitable temp directory...
+# [CLAUDE-AUTO-TEE] Testing TMPDIR: /path/to/temp
+# [CLAUDE-AUTO-TEE] Using TMPDIR: /path/to/temp
+# [CLAUDE-AUTO-TEE] Checking disk space for command execution...
+# Estimated command output size: 50MB
+# Disk space check: PASSED
+# [CLAUDE-AUTO-TEE] Generated temp file: /path/to/temp/claude-xxxxx.log
+# [CLAUDE-AUTO-TEE] Added cleanup logic for successful completion
+
+# 3. Test error handling
+echo '{"invalid":"json"}' | ./src/claude-auto-tee.sh
+
+# Expected: Structured error with code and context
+# [ERROR 2] Malformed JSON input: Input does not appear to be valid tool JSON
+# [VERBOSE] Error category: input
+# [VERBOSE] Error severity: error
+
+# 4. Test in Claude Code
+# Run any pipe command in Claude Code, should see:
+# - Command execution with tee injection
+# - "Full output saved to: /path/to/temp/claude-xxxxx.log"
+# - Automatic cleanup on success, preservation on failure
+
+# 5. Verify temp directory detection
+TMPDIR=/tmp CLAUDE_AUTO_TEE_VERBOSE=true echo '{"tool":{"name":"Bash","input":{"command":"echo test | cat"}},"timeout":null}' | ./src/claude-auto-tee.sh 2>&1 | grep "Testing TMPDIR"
+
+# Expected: [CLAUDE-AUTO-TEE] Testing TMPDIR: /tmp
 ```
 
 ### Troubleshooting
 
+**Quick Diagnosis:**
+All errors include numeric codes (1-99) for precise identification. Enable verbose mode for detailed debugging:
+
+```bash
+export CLAUDE_AUTO_TEE_VERBOSE=true
+# Then reproduce the issue
+```
+
 **Common Issues:**
 
-1. **"Permission denied"**
+1. **[ERROR 1] Invalid input provided**
+   - **Cause:** Malformed JSON or empty input
+   - **Solution:** Check Claude Code hook configuration
+   ```bash
+   cat ~/.claude/settings.json  # Verify hook setup
+   ```
+
+2. **[ERROR 10] No suitable temp directory found**
+   - **Cause:** No writable temp directories available
+   - **Solutions:**
+   ```bash
+   # Check temp directory permissions
+   ls -la "${TMPDIR:-/tmp}"
+   
+   # Set custom temp directory
+   export TMPDIR="$HOME/tmp"
+   mkdir -p "$TMPDIR"
+   
+   # Verify disk space
+   df -h "${TMPDIR:-/tmp}"
+   ```
+
+3. **[ERROR 20] Insufficient disk space**
+   - **Cause:** Less than 100MB available in temp directory
+   - **Solutions:**
+   ```bash
+   # Clean up old files
+   rm -f /tmp/claude-*.log
+   
+   # Use alternative temp location
+   export TMPDIR="/var/tmp"  # Often has more space
+   
+   # Check available space
+   df -h "${TMPDIR:-/tmp}"
+   ```
+
+4. **"Permission denied"**
    ```bash
    chmod +x src/claude-auto-tee.sh
    ```
 
-2. **"No such file or directory"**
+5. **"No such file or directory"**
    - Use absolute paths in settings.json
    - Verify file exists: `ls -la src/claude-auto-tee.sh`
+
+**For comprehensive troubleshooting, see:** [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+
+**Available diagnostic tools:**
+- `bash scripts/diagnose.sh` - Comprehensive system diagnostic
+- Error code reference: [docs/ERROR-CODES.md](docs/ERROR-CODES.md)
+- Verbose mode guide: [docs/VERBOSE-MODE.md](docs/VERBOSE-MODE.md)
+- Cleanup documentation: [docs/CLEANUP-ON-SUCCESS.md](docs/CLEANUP-ON-SUCCESS.md)
+
+### System Diagnostic
+
+Run the comprehensive diagnostic tool to check your system:
+
+```bash
+bash scripts/diagnose.sh
+```
+
+**Diagnostic checks include:**
+- Bash version compatibility (3.0+ required)
+- Required commands availability (`tee`, `mktemp`)
+- Temp directory permissions and space
+- Platform-specific configurations
+- Basic functionality testing
+- Process and file cleanup status
+
+**Example output:**
+```
+🔍 Claude Auto-Tee System Diagnostic
+=====================================
+
+System Requirements
+-------------------
+✅ Bash version: 5.2.15 (requirement: 3.0+)
+✅ tee command available
+✅ mktemp command available
+
+Temp Directory Configuration
+----------------------------
+ℹ️  Temp directory: /var/folders/xx/yyyy/T
+✅ Temp directory exists
+✅ Temp directory is writable
+ℹ️  Available space: 512GB
+✅ Sufficient disk space available
+
+✅ System appears ready for claude-auto-tee
+```
 
 3. **"Hook not triggering"**
    - Check settings.json syntax: `cat ~/.claude/settings.json | jq`
