@@ -9,6 +9,7 @@ IFS=$'\n\t'
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/error-codes.sh"
 source "${SCRIPT_DIR}/disk-space-check.sh"
+source "${SCRIPT_DIR}/path-utils.sh"
 
 # Environment variable overrides (P1.T003)
 readonly VERBOSE_MODE="${CLAUDE_AUTO_TEE_VERBOSE:-false}"
@@ -309,7 +310,8 @@ run_startup_cleanup() {
     # Add environment variable temp directories
     for env_temp_dir in "${TMPDIR:-}" "${TMP:-}" "${TEMP:-}" "${CLAUDE_AUTO_TEE_TEMP_DIR:-}"; do
         if [[ -n "$env_temp_dir" ]] && [[ -d "$env_temp_dir" ]]; then
-            local clean_dir="${env_temp_dir%/}"  # Remove trailing slash
+            local clean_dir
+            clean_dir=$(normalize_path "$env_temp_dir")
             # Check if not already in list
             local already_added=false
             for existing_dir in "${temp_dirs_to_clean[@]}"; do
@@ -465,7 +467,7 @@ get_temp_dir() {
     # Test candidates in priority order
     # 1. Claude Auto-Tee specific override (P1.T003)
     if [[ -n "${CLAUDE_AUTO_TEE_TEMP_DIR:-}" ]]; then
-        dir="${CLAUDE_AUTO_TEE_TEMP_DIR%/}"  # Remove trailing slash
+        dir=$(normalize_path "${CLAUDE_AUTO_TEE_TEMP_DIR}")
         log_verbose "Testing CLAUDE_AUTO_TEE_TEMP_DIR override: $dir"
         
         # Try to create directory if it doesn't exist
@@ -489,7 +491,7 @@ get_temp_dir() {
     
     # 2. Standard environment variables (cross-platform)
     if [[ -n "${TMPDIR:-}" ]]; then
-        dir="${TMPDIR%/}"  # Remove trailing slash
+        dir=$(normalize_path "${TMPDIR}")
         log_verbose "Testing TMPDIR: $dir"
         if test_temp_directory_suitability "$dir" "TMPDIR"; then
             log_verbose "Using TMPDIR: $dir"
@@ -500,7 +502,7 @@ get_temp_dir() {
     fi
     
     if [[ -n "${TMP:-}" ]]; then
-        dir="${TMP%/}"
+        dir=$(normalize_path "${TMP}")
         log_verbose "Testing TMP: $dir"
         if test_temp_directory_suitability "$dir" "TMP"; then
             log_verbose "Using TMP: $dir"
@@ -511,7 +513,7 @@ get_temp_dir() {
     fi
     
     if [[ -n "${TEMP:-}" ]]; then
-        dir="${TEMP%/}"
+        dir=$(normalize_path "${TEMP}")
         log_verbose "Testing TEMP: $dir"
         if test_temp_directory_suitability "$dir" "TEMP"; then
             log_verbose "Using TEMP: $dir"
@@ -741,9 +743,15 @@ if echo "$command" | grep -q " | "; then
         MAX_TEMP_FILE_SIZE="$DEFAULT_MAX_TEMP_FILE_SIZE"
     fi
     
-    # Generate unique temp file and cleanup script (P1.T013)
+    # Generate unique temp file and cleanup script (P1.T013, P1.T007)
     set_error_context "Creating temp file and cleanup script"
-    temp_file="${temp_dir}/${TEMP_FILE_PREFIX}-$(date +%s%N | cut -b1-13).log"
+    
+    # Use path utilities for robust cross-platform path handling
+    if ! temp_file=$(create_safe_temp_path "$temp_dir" "$TEMP_FILE_PREFIX" ".log"); then
+        log_verbose "Failed to create safe temp path, falling back to basic method"
+        temp_file="${temp_dir}/${TEMP_FILE_PREFIX}-$(date +%s%N | cut -b1-13).log"
+        temp_file=$(normalize_path "$temp_file")
+    fi
     
     # Set global variables for interruption cleanup (P1.T014)
     CURRENT_TEMP_FILE="$temp_file"
