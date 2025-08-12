@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "preToolUse": [
+      {
+        "command": "./scripts/hooks/pre-tool-use.sh",
+        "matchers": ["Bash", "Edit", "Write", "MultiEdit"]
+      }
+    ]
+  }
+}
