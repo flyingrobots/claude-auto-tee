@@ -94,11 +94,11 @@ validate_existing_tee() {
 run_integration_test "Commands with existing tee should be preserved" "$input3" validate_existing_tee
 
 echo "=== Test 4: Complex Pipeline Integration ==="
-input4='{"tool":{"name":"Bash","input":{"command":"find . -name \"*.sh\" | grep test | head -5"}},"timeout":null}'
+input4='{"tool":{"name":"Bash","input":{"command":"ls -la | grep test | head -5"}},"timeout":null}'
 validate_complex_pipeline() {
     local output="$1"
     validate_json_structure "$output" && 
-    echo "$output" | grep -q "find.*tee.*claude-.*log.*grep test.*head -5"
+    echo "$output" | grep -q "ls -la 2>&1.*tee.*claude-.*log.*grep test.*head -5"
 }
 run_integration_test "Complex pipeline should inject tee correctly" "$input4" validate_complex_pipeline
 
