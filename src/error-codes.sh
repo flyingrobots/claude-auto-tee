@@ -28,6 +28,9 @@ readonly ERR_TEMP_FILE_CREATE_FAILED=12
 readonly ERR_TEMP_FILE_WRITE_FAILED=13
 readonly ERR_TEMP_FILE_READ_FAILED=14
 readonly ERR_TEMP_DIR_NOT_FOUND=15
+readonly ERR_READONLY_FILESYSTEM=16
+readonly ERR_CONTAINER_RESTRICTIONS=17
+readonly ERR_DIRECTORY_CREATE_FAILED=18
 
 # Resource/Space Errors (20-29)
 readonly ERR_INSUFFICIENT_SPACE=20
@@ -98,6 +101,9 @@ if declare -A test_array 2>/dev/null; then
     [$ERR_TEMP_FILE_WRITE_FAILED]="Failed to write to temp file"
     [$ERR_TEMP_FILE_READ_FAILED]="Failed to read from temp file"
     [$ERR_TEMP_DIR_NOT_FOUND]="Specified temp directory not found"
+    [$ERR_READONLY_FILESYSTEM]="Read-only filesystem detected"
+    [$ERR_CONTAINER_RESTRICTIONS]="Container environment restrictions detected"
+    [$ERR_DIRECTORY_CREATE_FAILED]="Failed to create temp directory"
     
     # Resource/Space Errors
     [$ERR_INSUFFICIENT_SPACE]="Insufficient disk space for temp file"
@@ -165,6 +171,9 @@ else
             $ERR_TEMP_FILE_WRITE_FAILED) echo "Failed to write to temp file" ;;
             $ERR_TEMP_FILE_READ_FAILED) echo "Failed to read from temp file" ;;
             $ERR_TEMP_DIR_NOT_FOUND) echo "Specified temp directory not found" ;;
+            $ERR_READONLY_FILESYSTEM) echo "Read-only filesystem detected" ;;
+            $ERR_CONTAINER_RESTRICTIONS) echo "Container environment restrictions detected" ;;
+            $ERR_DIRECTORY_CREATE_FAILED) echo "Failed to create temp directory" ;;
             $ERR_INSUFFICIENT_SPACE) echo "Insufficient disk space for temp file" ;;
             $ERR_DISK_FULL) echo "Disk full during operation" ;;
             $ERR_QUOTA_EXCEEDED) echo "Disk quota exceeded" ;;
