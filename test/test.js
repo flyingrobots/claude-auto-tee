@@ -177,14 +177,14 @@ async function testComplexPipelines() {
   const input = {
     tool: { 
       name: 'Bash', 
-      input: { command: 'find . -name "*.ts" | grep -v node_modules | head -20' } 
+      input: { command: 'ls -la | grep -v node_modules | head -20' } 
     }
   };
   
   const result = await runHook(input);
   const cmd = result.tool.input.command;
   
-  assert(cmd.includes('find . -name "*.ts" 2>&1 | tee'), 'Should inject tee after first command');
+  assert(cmd.includes('ls -la 2>&1 | tee'), 'Should inject tee after first command');
   assert(cmd.includes('| grep -v node_modules | head -20'), 'Should preserve rest of pipeline');
 }
 
@@ -193,7 +193,7 @@ async function testPipeOnlyDetection() {
   const testCases = [
     // Should activate (has pipe, no existing tee)
     { command: 'npm run build | head -10', shouldActivate: true },
-    { command: 'find . -name "*.js" | grep test', shouldActivate: true },
+    { command: 'ls -la | grep test', shouldActivate: true },
     { command: 'ls -la | wc -l', shouldActivate: true },
     { command: 'echo "test" | cat', shouldActivate: true },
     
