@@ -1,0 +1,247 @@
+{
+  "metadata": {
+    "analysis_date": "2025-08-12",
+    "total_tasks": 84,
+    "root_tasks": 11,
+    "dependency_analysis": "Based on technical prerequisites, sequential requirements, infrastructure dependencies, and logical ordering"
+  },
+  "nodes": [
+    "P1.T001", "P1.T002", "P1.T003", "P1.T004", "P1.T005", "P1.T006", "P1.T007", "P1.T008",
+    "P1.T009", "P1.T010", "P1.T011", "P1.T012", "P1.T013", "P1.T014", "P1.T015", "P1.T016",
+    "P1.T017", "P1.T018", "P1.T019", "P1.T020", "P1.T021", "P1.T022", "P1.T023", "P1.T024",
+    "P1.T025", "P1.T026", "P1.T027", "P1.T028", "P1.T029", "P1.T030", "P1.T031", "P1.T032",
+    "P1.T033", "P1.T034", "P1.T035", "P1.T036", "P1.T037", "P1.T038", "P1.T039", "P1.T040",
+    "P1.T041", "P1.T042", "P1.T043", "P1.T044", "P1.T045", "P1.T046", "P1.T047", "P1.T048",
+    "P1.T049", "P1.T050", "P1.T051", "P1.T052", "P1.T053", "P1.T054", "P1.T055", "P1.T056",
+    "P1.T057", "P1.T058", "P1.T059", "P1.T060", "P1.T061", "P1.T062", "P1.T063", "P1.T064",
+    "P1.T065", "P1.T066", "P1.T067", "P1.T068", "P1.T069", "P1.T070", "P1.T071", "P1.T072",
+    "P1.T073", "P1.T074", "P1.T075", "P1.T076", "P1.T077", "P1.T078", "P1.T079", "P1.T080",
+    "P1.T081", "P1.T082", "P1.T083", "P1.T084"
+  ],
+  "edges": [
+    {"id": "t002-t001", "from": "P1.T002", "to": "P1.T001", "reason": "temp directory implementation needs research foundation"},
+    {"id": "t003-t002", "from": "P1.T003", "to": "P1.T002", "reason": "environment override needs basic temp directory implementation"},
+    {"id": "t004-t002", "from": "P1.T004", "to": "P1.T002", "reason": "edge case handling needs basic temp directory implementation"},
+    {"id": "t006-t005", "from": "P1.T006", "to": "P1.T005", "reason": "platform-specific tests need test environments set up"},
+    {"id": "t007-t005", "from": "P1.T007", "to": "P1.T005", "reason": "path handling tests need test environments set up"},
+    {"id": "t008-t005", "from": "P1.T008", "to": "P1.T005", "reason": "permission tests need test environments set up"},
+    {"id": "t006-t002", "from": "P1.T006", "to": "P1.T002", "reason": "platform-specific tests need cross-platform implementation"},
+    {"id": "t007-t002", "from": "P1.T007", "to": "P1.T002", "reason": "path handling tests need cross-platform implementation"},
+    {"id": "t008-t002", "from": "P1.T008", "to": "P1.T002", "reason": "permission tests need cross-platform implementation"},
+    {"id": "t009-t002", "from": "P1.T009", "to": "P1.T002", "reason": "restricted environment tests need basic implementation"},
+    {"id": "t010-t002", "from": "P1.T010", "to": "P1.T002", "reason": "proxy/firewall tests need basic implementation"},
+    {"id": "t011-t002", "from": "P1.T011", "to": "P1.T002", "reason": "shell validation needs basic implementation"},
+    {"id": "t012-t002", "from": "P1.T012", "to": "P1.T002", "reason": "security software tests need basic implementation"},
+    {"id": "t014-t013", "from": "P1.T014", "to": "P1.T013", "reason": "interruption cleanup builds on basic cleanup"},
+    {"id": "t015-t013", "from": "P1.T015", "to": "P1.T013", "reason": "age-based cleanup builds on basic cleanup"},
+    {"id": "t016-t013", "from": "P1.T016", "to": "P1.T013", "reason": "graceful failure handling builds on basic cleanup"},
+    {"id": "t018-t017", "from": "P1.T018", "to": "P1.T017", "reason": "size limits need disk space checking"},
+    {"id": "t019-t017", "from": "P1.T019", "to": "P1.T017", "reason": "error messages need disk space checking"},
+    {"id": "t020-t017", "from": "P1.T020", "to": "P1.T017", "reason": "alternative locations need disk space checking"},
+    {"id": "t022-t021", "from": "P1.T022", "to": "P1.T021", "reason": "usage warnings build on verbose mode"},
+    {"id": "t023-t021", "from": "P1.T023", "to": "P1.T021", "reason": "diagnostics build on verbose mode"},
+    {"id": "t025-t024", "from": "P1.T025", "to": "P1.T024", "reason": "structured error messages need error codes"},
+    {"id": "t026-t024", "from": "P1.T026", "to": "P1.T024", "reason": "debug mode needs error framework"},
+    {"id": "t027-t024", "from": "P1.T027", "to": "P1.T024", "reason": "environment info needs error framework"},
+    {"id": "t029-t028", "from": "P1.T029", "to": "P1.T028", "reason": "retry mechanisms build on graceful degradation"},
+    {"id": "t030-t028", "from": "P1.T030", "to": "P1.T028", "reason": "safe-mode builds on graceful degradation"},
+    {"id": "t031-t028", "from": "P1.T031", "to": "P1.T028", "reason": "partial execution handling builds on graceful degradation"},
+    {"id": "t032-t024", "from": "P1.T032", "to": "P1.T024", "reason": "large output handling needs error framework"},
+    {"id": "t033-t024", "from": "P1.T033", "to": "P1.T024", "reason": "binary output handling needs error framework"},
+    {"id": "t034-t024", "from": "P1.T034", "to": "P1.T024", "reason": "unicode support needs error framework"},
+    {"id": "t035-t024", "from": "P1.T035", "to": "P1.T024", "reason": "network interruption handling needs error framework"},
+    {"id": "t036-t024", "from": "P1.T036", "to": "P1.T024", "reason": "resource exhaustion handling needs error framework"},
+    {"id": "t038-t002", "from": "P1.T038", "to": "P1.T002", "reason": "platform-specific installation docs need cross-platform implementation"},
+    {"id": "t039-t037", "from": "P1.T039", "to": "P1.T037", "reason": "quick-start guide builds on installation instructions"},
+    {"id": "t040-t037", "from": "P1.T040", "to": "P1.T037", "reason": "system requirements documentation builds on installation instructions"},
+    {"id": "t042-t002", "from": "P1.T042", "to": "P1.T002", "reason": "platform-specific troubleshooting needs cross-platform implementation"},
+    {"id": "t042-t024", "from": "P1.T042", "to": "P1.T024", "reason": "platform-specific troubleshooting needs error framework"},
+    {"id": "t043-t026", "from": "P1.T043", "to": "P1.T026", "reason": "debug mode usage docs need debug mode implementation"},
+    {"id": "t044-t041", "from": "P1.T044", "to": "P1.T041", "reason": "FAQ builds on common error scenarios"},
+    {"id": "t045-t002", "from": "P1.T045", "to": "P1.T002", "reason": "supported platforms documentation needs cross-platform implementation"},
+    {"id": "t046-t002", "from": "P1.T046", "to": "P1.T002", "reason": "limitations documentation needs cross-platform implementation"},
+    {"id": "t047-t002", "from": "P1.T047", "to": "P1.T002", "reason": "performance characteristics need implementation"},
+    {"id": "t048-t002", "from": "P1.T048", "to": "P1.T002", "reason": "shell integration guidelines need cross-platform implementation"},
+    {"id": "t050-t002", "from": "P1.T050", "to": "P1.T002", "reason": "platform-specific test cases need cross-platform implementation"},
+    {"id": "t050-t049", "from": "P1.T050", "to": "P1.T049", "reason": "platform-specific tests build on expanded test suite"},
+    {"id": "t051-t024", "from": "P1.T051", "to": "P1.T024", "reason": "error scenario integration tests need error framework"},
+    {"id": "t051-t049", "from": "P1.T051", "to": "P1.T049", "reason": "error scenario tests build on expanded test suite"},
+    {"id": "t052-t049", "from": "P1.T052", "to": "P1.T049", "reason": "performance regression tests build on expanded test suite"},
+    {"id": "t054-t053", "from": "P1.T054", "to": "P1.T053", "reason": "Claude Code version testing needs manual test checklist"},
+    {"id": "t055-t053", "from": "P1.T055", "to": "P1.T053", "reason": "command type validation needs manual test checklist"},
+    {"id": "t056-t053", "from": "P1.T056", "to": "P1.T053", "reason": "interruption/recovery testing needs manual test checklist"},
+    {"id": "t058-t057", "from": "P1.T058", "to": "P1.T057", "reason": "beta testing instructions need beta testing group"},
+    {"id": "t059-t057", "from": "P1.T059", "to": "P1.T057", "reason": "feedback collection needs beta testing group"},
+    {"id": "t060-t057", "from": "P1.T060", "to": "P1.T057", "reason": "beta release package needs beta testing group"},
+    {"id": "t060-t002", "from": "P1.T060", "to": "P1.T002", "reason": "beta release package needs core implementation"},
+    {"id": "t062-t061", "from": "P1.T062", "to": "P1.T061", "reason": "input validation builds on code review"},
+    {"id": "t063-t061", "from": "P1.T063", "to": "P1.T061", "reason": "improved error handling builds on code review"},
+    {"id": "t064-t061", "from": "P1.T064", "to": "P1.T061", "reason": "consistent coding style builds on code review"},
+    {"id": "t066-t065", "from": "P1.T066", "to": "P1.T065", "reason": "environment variable config builds on config file support"},
+    {"id": "t067-t065", "from": "P1.T067", "to": "P1.T065", "reason": "parameter validation builds on config file support"},
+    {"id": "t068-t065", "from": "P1.T068", "to": "P1.T065", "reason": "default value management builds on config file support"},
+    {"id": "t070-t069", "from": "P1.T070", "to": "P1.T069", "reason": "performance metrics build on logging implementation"},
+    {"id": "t071-t069", "from": "P1.T071", "to": "P1.T069", "reason": "health check builds on logging implementation"},
+    {"id": "t072-t069", "from": "P1.T072", "to": "P1.T069", "reason": "usage statistics build on logging implementation"},
+    {"id": "t074-t073", "from": "P1.T074", "to": "P1.T073", "reason": "version management needs release artifacts"},
+    {"id": "t075-t073", "from": "P1.T075", "to": "P1.T073", "reason": "checksum/signature needs release artifacts"},
+    {"id": "t076-t073", "from": "P1.T076", "to": "P1.T073", "reason": "installation script validation needs release artifacts"},
+    {"id": "t078-t037", "from": "P1.T078", "to": "P1.T037", "reason": "comprehensive README builds on installation documentation"},
+    {"id": "t079-t078", "from": "P1.T079", "to": "P1.T078", "reason": "issue templates build on comprehensive README"},
+    {"id": "t080-t078", "from": "P1.T080", "to": "P1.T078", "reason": "GitHub Actions build on comprehensive README"},
+    {"id": "t082-t081", "from": "P1.T082", "to": "P1.T081", "reason": "launch messaging needs community advocates"},
+    {"id": "t083-t081", "from": "P1.T083", "to": "P1.T081", "reason": "support channel strategy needs community advocates"},
+    {"id": "t084-t081", "from": "P1.T084", "to": "P1.T081", "reason": "contribution guidelines need community advocates"}
+  ],
+  "root_tasks": [
+    "P1.T001",
+    "P1.T005", 
+    "P1.T013",
+    "P1.T017",
+    "P1.T021",
+    "P1.T024",
+    "P1.T028",
+    "P1.T037",
+    "P1.T041",
+    "P1.T049",
+    "P1.T053",
+    "P1.T057",
+    "P1.T061",
+    "P1.T065",
+    "P1.T069",
+    "P1.T073",
+    "P1.T077",
+    "P1.T081"
+  ],
+  "dependency_paths": [
+    {
+      "root": "P1.T001",
+      "description": "Cross-platform temp directory research path",
+      "path": ["t002-t001", "t003-t002", "t004-t002", "t006-t002", "t007-t002", "t008-t002", "t009-t002", "t010-t002", "t011-t002", "t012-t002", "t038-t002", "t042-t002", "t045-t002", "t046-t002", "t047-t002", "t048-t002", "t050-t002", "t060-t002"]
+    },
+    {
+      "root": "P1.T005",
+      "description": "Testing environment setup path",
+      "path": ["t006-t005", "t007-t005", "t008-t005"]
+    },
+    {
+      "root": "P1.T013",
+      "description": "Resource cleanup management path", 
+      "path": ["t014-t013", "t015-t013", "t016-t013"]
+    },
+    {
+      "root": "P1.T017",
+      "description": "Disk space management path",
+      "path": ["t018-t017", "t019-t017", "t020-t017"]
+    },
+    {
+      "root": "P1.T021",
+      "description": "Resource monitoring path",
+      "path": ["t022-t021", "t023-t021"]
+    },
+    {
+      "root": "P1.T024",
+      "description": "Error diagnostics framework path",
+      "path": ["t025-t024", "t026-t024", "t027-t024", "t032-t024", "t033-t024", "t034-t024", "t035-t024", "t036-t024", "t042-t024", "t051-t024"]
+    },
+    {
+      "root": "P1.T028",
+      "description": "Fallback behaviors path",
+      "path": ["t029-t028", "t030-t028", "t031-t028"]
+    },
+    {
+      "root": "P1.T037",
+      "description": "Documentation foundation path",
+      "path": ["t039-t037", "t040-t037", "t078-t037"]
+    },
+    {
+      "root": "P1.T041",
+      "description": "Troubleshooting documentation path",
+      "path": ["t044-t041"]
+    },
+    {
+      "root": "P1.T049",
+      "description": "Automated testing expansion path",
+      "path": ["t050-t049", "t051-t049", "t052-t049"]
+    },
+    {
+      "root": "P1.T053",
+      "description": "Manual testing protocol path",
+      "path": ["t054-t053", "t055-t053", "t056-t053"]
+    },
+    {
+      "root": "P1.T057",
+      "description": "Beta testing preparation path",
+      "path": ["t058-t057", "t059-t057", "t060-t057"]
+    },
+    {
+      "root": "P1.T061",
+      "description": "Code hardening path",
+      "path": ["t062-t061", "t063-t061", "t064-t061"]
+    },
+    {
+      "root": "P1.T065",
+      "description": "Configuration management path",
+      "path": ["t066-t065", "t067-t065", "t068-t065"]
+    },
+    {
+      "root": "P1.T069",
+      "description": "Logging and monitoring path",
+      "path": ["t070-t069", "t071-t069", "t072-t069"]
+    },
+    {
+      "root": "P1.T073",
+      "description": "Distribution package path",
+      "path": ["t074-t073", "t075-t073", "t076-t073"]
+    },
+    {
+      "root": "P1.T077",
+      "description": "Repository optimization path",
+      "path": ["t079-t078", "t080-t078"]
+    },
+    {
+      "root": "P1.T081",
+      "description": "Community preparation path",
+      "path": ["t082-t081", "t083-t081", "t084-t081"]
+    }
+  ],
+  "critical_paths": [
+    {
+      "description": "Core Implementation Path",
+      "tasks": ["P1.T001", "P1.T002", "P1.T003", "P1.T004"],
+      "rationale": "Foundation for all cross-platform functionality"
+    },
+    {
+      "description": "Error Handling Infrastructure",
+      "tasks": ["P1.T024", "P1.T025", "P1.T026", "P1.T027"],
+      "rationale": "Required for robust operation and debugging"
+    },
+    {
+      "description": "Testing Foundation",
+      "tasks": ["P1.T005", "P1.T049", "P1.T053"],
+      "rationale": "Infrastructure needed before feature-specific testing"
+    },
+    {
+      "description": "Documentation Foundation",
+      "tasks": ["P1.T037", "P1.T078"],
+      "rationale": "Core documentation infrastructure before specific guides"
+    }
+  ],
+  "parallel_execution_groups": [
+    {
+      "group_name": "Independent Research Tasks",
+      "tasks": ["P1.T001", "P1.T017", "P1.T021", "P1.T057", "P1.T077", "P1.T081"],
+      "rationale": "These tasks involve research and planning with no technical dependencies"
+    },
+    {
+      "group_name": "Basic Infrastructure Setup",
+      "tasks": ["P1.T013", "P1.T024", "P1.T028", "P1.T037", "P1.T041", "P1.T061", "P1.T065", "P1.T069", "P1.T073"],
+      "rationale": "Foundation tasks that can be worked on in parallel once research is complete"
+    },
+    {
+      "group_name": "Implementation-Dependent Testing",
+      "tasks": ["P1.T006", "P1.T007", "P1.T008", "P1.T050"],
+      "rationale": "Testing tasks that depend on P1.T002 cross-platform implementation"
+    }
+  ]
+}

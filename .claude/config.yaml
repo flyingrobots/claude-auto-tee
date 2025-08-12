@@ -1,0 +1,127 @@
+# Claude Auto-Tee Project Configuration
+# Global configuration for project planning and development workflows
+
+project-planning:
+  # Default execution modes for different project types
+  default-mode: auto
+  
+  # Default outputs to generate
+  default-outputs: 
+    - roadmap
+    - tasks
+    - mermaid
+  
+  # GitHub integration settings
+  github-integration: true
+  auto-create-issues: false  # Require explicit --github-project flag
+  
+  # Template preferences - which mode works best for each template
+  template-preferences:
+    web-app: team
+    api: solo
+    cli-tool: solo 
+    library: solo
+    enterprise: waves
+    
+  # Quality thresholds
+  quality-thresholds:
+    minimum-spec-score: 40  # Below this, show warnings
+    recommended-spec-score: 70  # Above this, high confidence
+    
+  # Execution mode auto-detection weights
+  complexity-weights:
+    file-size: 0.3        # Larger files indicate more complexity
+    content-indicators: 0.4  # Keywords like "enterprise", "team", "distributed"
+    requirement-count: 0.3   # Number of distinct requirements
+
+# Development workflow integration
+dev-workflow:
+  # Git integration
+  git:
+    auto-detect-branch-strategy: true
+    suggest-branch-names: true
+    create-commit-templates: false
+    
+  # IDE integration  
+  ide:
+    generate-vscode-tasks: true
+    create-debug-configs: true
+    setup-extensions-recommendations: true
+    
+  # CI/CD integration
+  cicd:
+    suggest-github-actions: true
+    create-pipeline-templates: false
+    setup-quality-gates: true
+
+# Output customization
+output:
+  # Mermaid diagram settings
+  mermaid:
+    theme: default
+    direction: TD  # Top-Down
+    include-complexity-indicators: true
+    
+  # Roadmap generation
+  roadmap:
+    include-time-estimates: true
+    show-dependency-chains: true
+    include-risk-assessment: true
+    
+  # GitHub issue settings
+  github-issues:
+    default-labels: 
+      - task
+      - planning
+      - automated
+    include-phase-labels: true
+    add-priority-labels: true
+    create-epic-structure: true
+
+# Team configuration templates
+team-templates:
+  startup:
+    size: 2-4
+    roles: [fullstack, designer]
+    sprint-length: 1 week
+    
+  small-team:
+    size: 4-6  
+    roles: [frontend, backend, qa, designer]
+    sprint-length: 2 weeks
+    
+  enterprise:
+    size: 8-20
+    roles: [tech-lead, frontend, backend, qa, devops, architect, pm]
+    sprint-length: 2 weeks
+    coordination-meetings: daily
+
+# Risk assessment configuration
+risk-assessment:
+  # Factors that increase project risk
+  risk-indicators:
+    - new-technology
+    - tight-deadline
+    - large-team
+    - external-dependencies
+    - undefined-requirements
+    
+  # Mitigation strategies
+  mitigation-strategies:
+    new-technology: "Add research spike and proof-of-concept tasks"
+    tight-deadline: "Suggest phased delivery and MVP approach"  
+    large-team: "Recommend waves execution with clear coordination"
+    external-dependencies: "Create dependency tracking and contingency plans"
+    undefined-requirements: "Add requirements gathering and stakeholder alignment tasks"
+
+# Advanced features
+advanced:
+  # AI-enhanced analysis
+  enable-ai-analysis: true
+  include-optimization-suggestions: true
+  detect-anti-patterns: true
+  
+  # Extensibility
+  custom-templates-dir: ~/.claude/templates/
+  custom-analyzers-dir: ~/.claude/analyzers/
+  plugin-system: enabled
