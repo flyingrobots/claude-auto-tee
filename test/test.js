@@ -184,7 +184,8 @@ async function testComplexPipelines() {
   const result = await runHook(input);
   const cmd = result.tool.input.command;
   
-  assert(cmd.includes('ls -la 2>&1 | tee'), 'Should inject tee after first command');
+  // With size limits enabled by default (P1.T018), expect head -c injection
+  assert(cmd.includes('ls -la 2>&1 | head -c') && cmd.includes('| tee'), 'Should inject size limit and tee after first command');
   assert(cmd.includes('| grep -v node_modules | head -20'), 'Should preserve rest of pipeline');
 }
 
