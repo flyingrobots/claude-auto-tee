@@ -321,6 +321,9 @@ run_all_tests() {
     echo "Graceful Degradation Test Suite"
     echo "======================================="
     
+    # Create test results directory for CI
+    mkdir -p /tmp/test-results
+    
     # Set up test environment
     export CLAUDE_AUTO_TEE_VERBOSE=1  # Enable verbose mode for testing
     
@@ -342,6 +345,26 @@ run_all_tests() {
     echo "  Passed: $TESTS_PASSED"
     echo "  Failed: $TESTS_FAILED"
     echo "======================================="
+    
+    # Write test results for CI
+    {
+        echo "# Graceful Degradation Test Results"
+        echo ""
+        echo "## Summary"
+        echo "- Tests run: $TESTS_RUN"
+        echo "- Passed: $TESTS_PASSED"
+        echo "- Failed: $TESTS_FAILED"
+        echo "- Success rate: $(( (TESTS_PASSED * 100) / TESTS_RUN ))%"
+        echo ""
+        echo "## Status"
+        if [ $TESTS_FAILED -eq 0 ]; then
+            echo "✅ All tests passed!"
+        else
+            echo "❌ Some tests failed"
+        fi
+        echo ""
+        echo "Generated at: $(date)"
+    } > /tmp/test-results/test-summary.md
     
     if [ $TESTS_FAILED -eq 0 ]; then
         echo "✓ All tests passed!"
