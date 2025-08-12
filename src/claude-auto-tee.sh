@@ -550,12 +550,14 @@ if echo "$command" | grep -q " | "; then
     
     # Add cleanup on successful completion (P1.T013)
     # Use CLEANUP_ON_SUCCESS environment variable override (P1.T003)
+    final_command="$modified_command"
+    
     if [[ "$CLEANUP_ON_SUCCESS" == "true" ]] && [[ -n "$cleanup_script" ]] && [[ -f "$cleanup_script" ]]; then
-        cleanup_command="source \"$cleanup_script\" && { $modified_command; } && { echo \"Full output saved to: $temp_file\"; cleanup_temp_file \"$temp_file\"; rm -f \"$cleanup_script\" 2>/dev/null || true; } || { echo \"Command failed - temp file preserved: $temp_file\"; rm -f \"$cleanup_script\" 2>/dev/null || true; }"
+        cleanup_command="source \"$cleanup_script\" && { $final_command; } && { echo \"Full output saved to: $temp_file\"; cleanup_temp_file \"$temp_file\"; rm -f \"$cleanup_script\" 2>/dev/null || true; } || { echo \"Command failed - temp file preserved: $temp_file\"; rm -f \"$cleanup_script\" 2>/dev/null || true; }"
         log_verbose "Added cleanup logic for successful completion (CLEANUP_ON_SUCCESS=$CLEANUP_ON_SUCCESS)"
     else
         # No cleanup or cleanup disabled - preserve temp file
-        cleanup_command="{ $modified_command; } && echo \"Full output saved to: $temp_file\" || echo \"Command failed - temp file preserved: $temp_file\""
+        cleanup_command="{ $final_command; } && echo \"Full output saved to: $temp_file\" || echo \"Command failed - temp file preserved: $temp_file\""
         if [[ "$CLEANUP_ON_SUCCESS" != "true" ]]; then
             log_verbose "Cleanup disabled via CLAUDE_AUTO_TEE_CLEANUP_ON_SUCCESS=$CLEANUP_ON_SUCCESS"
         else
