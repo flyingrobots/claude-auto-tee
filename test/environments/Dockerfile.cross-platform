@@ -13,4 +13,3 @@ RUN chmod +x test/graceful-degradation-test.sh
 
 # Default command runs our bash tests
 CMD ["bash", "test/graceful-degradation-test.sh"]
-EOF < /dev/null
