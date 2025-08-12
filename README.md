@@ -413,7 +413,7 @@ Claude Auto-Tee supports environment variable overrides for advanced customizati
 | `CLAUDE_AUTO_TEE_TEMP_DIR` | Override temp directory | Auto-detected | `export CLAUDE_AUTO_TEE_TEMP_DIR=/custom/temp` |
 | `CLAUDE_AUTO_TEE_CLEANUP_ON_SUCCESS` | Auto-cleanup temp files | `true` | `export CLAUDE_AUTO_TEE_CLEANUP_ON_SUCCESS=false` |
 | `CLAUDE_AUTO_TEE_TEMP_PREFIX` | Customize temp file prefix | `claude` | `export CLAUDE_AUTO_TEE_TEMP_PREFIX=debug` |
-| `CLAUDE_AUTO_TEE_MAX_SIZE` | Size limit hint (bytes) | None | `export CLAUDE_AUTO_TEE_MAX_SIZE=104857600` |
+| `CLAUDE_AUTO_TEE_MAX_SIZE` | Size limit for temp files (bytes) | 104857600 (100MB) | `export CLAUDE_AUTO_TEE_MAX_SIZE=52428800` |
 
 ### Usage Examples
 

@@ -87,7 +87,7 @@ The longest dependency chain is **8 levels deep**:
 **Level 1 Dependencies - Platform Features**
 - [x] [P1.T003](https://github.com/flyingrobots/claude-auto-tee/issues/3) - Add environment variable override support (1.5h)
   - *Depends on: P1.T002*
-- [ ] [P1.T004](https://github.com/flyingrobots/claude-auto-tee/issues/4) - Handle edge cases (read-only filesystems) (2.5h)
+- [x] [P1.T004](https://github.com/flyingrobots/claude-auto-tee/issues/4) - Handle edge cases (read-only filesystems) (2.5h)
   - *Depends on: P1.T002*
 
 #### Day 4 Morning (4 hours)

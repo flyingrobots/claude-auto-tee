@@ -46,11 +46,21 @@ Changes the temp file naming pattern from `claude-{timestamp}.log` to `{prefix}-
 
 #### `CLAUDE_AUTO_TEE_MAX_SIZE`
 **Purpose**: Set maximum size limit for temp files  
-**Default**: None (no limit)  
+**Default**: 104857600 (100MB)  
 **Format**: Size in bytes (numeric)  
-**Example**: `export CLAUDE_AUTO_TEE_MAX_SIZE=104857600`  # 100MB
+**Example**: `export CLAUDE_AUTO_TEE_MAX_SIZE=52428800`  # 50MB
 
-When set, provides a size hint for monitoring temp file growth. Note: This is informational and does not enforce hard limits during command execution.
+Enforces a hard limit on temp file size by using `head -c SIZE` in the command pipeline. When output exceeds this limit:
+- Output is truncated at the specified size
+- A warning message is displayed to stderr
+- Temp file is created with truncated content
+- Command continues normally with truncated data passed to the pipeline
+
+**Size Guidelines:**
+- **Small files**: 1MB-10MB for log analysis, config processing
+- **Medium files**: 50MB-100MB for build outputs, test results  
+- **Large files**: 500MB-1GB for data processing (use with caution)
+- **Maximum recommended**: 1GB to avoid system resource issues
 
 ## Environment Variable Priority
 
