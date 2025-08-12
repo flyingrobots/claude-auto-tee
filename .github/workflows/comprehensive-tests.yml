@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+# Add permissions for GitHub token to post comments on PRs
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 jobs:
   # Basic tests on multiple platforms and Node versions
   basic-tests:
