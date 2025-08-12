@@ -67,6 +67,32 @@ Enforces a hard limit on temp file size by using `head -c SIZE` in the command p
 - **Large files**: 500MB-1GB for data processing (use with caution)
 - **Maximum recommended**: 1GB to avoid system resource issues
 
+### Age-Based Cleanup Overrides (P1.T015)
+
+#### `CLAUDE_AUTO_TEE_ENABLE_AGE_CLEANUP`
+
+**Purpose**: Enable or disable age-based cleanup of orphaned temp files  
+**Default**: `true`  
+**Values**: `true`, `false`  
+**Example**: `export CLAUDE_AUTO_TEE_ENABLE_AGE_CLEANUP=false`
+
+When enabled, claude-auto-tee will automatically clean up orphaned temp files on startup. Orphaned files are those left behind by previous crashed or interrupted sessions. This cleanup runs during tool initialization and only affects files older than the configured age threshold.
+
+#### `CLAUDE_AUTO_TEE_CLEANUP_AGE_HOURS`
+
+**Purpose**: Set age threshold for orphaned file cleanup  
+**Default**: `48` (48 hours)  
+**Format**: Hours as a positive integer  
+**Example**: `export CLAUDE_AUTO_TEE_CLEANUP_AGE_HOURS=24`  # Clean files older than 24 hours
+
+Files older than this threshold are eligible for cleanup during startup. The cleanup process includes safety checks to avoid deleting files that are currently in use.
+
+**Recommended Values:**
+- **Conservative**: 72+ hours for shared systems
+- **Standard**: 48 hours (default) for typical development environments
+- **Aggressive**: 24 hours for systems with limited disk space
+- **Minimal**: 12 hours for temporary/testing environments
+
 ## Environment Variable Priority
 
 The environment variables are processed in the following order:
@@ -112,6 +138,22 @@ export CLAUDE_AUTO_TEE_TEMP_PREFIX=debug
 claude-code  # Temp files will be named debug-{timestamp}.log
 ```
 
+### Disable Age-Based Cleanup
+
+```bash
+# Disable automatic cleanup of orphaned files
+export CLAUDE_AUTO_TEE_ENABLE_AGE_CLEANUP=false
+claude-code  # Old temp files will not be automatically cleaned up
+```
+
+### Custom Cleanup Age Threshold
+
+```bash
+# Clean up files older than 24 hours instead of default 48 hours
+export CLAUDE_AUTO_TEE_CLEANUP_AGE_HOURS=24
+claude-code  # More aggressive cleanup of orphaned files
+```
+
 ### Combined Configuration
 
 ```bash
@@ -120,8 +162,9 @@ export CLAUDE_AUTO_TEE_VERBOSE=true
 export CLAUDE_AUTO_TEE_CLEANUP_ON_SUCCESS=false
 export CLAUDE_AUTO_TEE_TEMP_PREFIX=debug
 export CLAUDE_AUTO_TEE_TEMP_DIR=/tmp/claude-debug
+export CLAUDE_AUTO_TEE_CLEANUP_AGE_HOURS=72
 
-claude-code  # Verbose mode, no cleanup, custom prefix, custom directory
+claude-code  # Verbose mode, no cleanup, custom prefix, custom directory, 72h orphan cleanup
 ```
 
 ## Shell Integration
@@ -135,6 +178,8 @@ Add to `~/.bashrc`, `~/.zshrc`, or equivalent:
 export CLAUDE_AUTO_TEE_VERBOSE=false
 export CLAUDE_AUTO_TEE_CLEANUP_ON_SUCCESS=true
 export CLAUDE_AUTO_TEE_TEMP_PREFIX=claude
+export CLAUDE_AUTO_TEE_ENABLE_AGE_CLEANUP=true
+export CLAUDE_AUTO_TEE_CLEANUP_AGE_HOURS=48
 
 # Optional: Set custom temp directory for all sessions
 # export CLAUDE_AUTO_TEE_TEMP_DIR=/custom/temp/path
