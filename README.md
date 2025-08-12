@@ -57,17 +57,20 @@ Following structured expert debate with **unanimous 5-0 vote for radical simplif
 ### Quick Install (Recommended)
 
 **1. Clone the repository:**
+
 ```bash
 git clone https://github.com/flyingrobots/claude-auto-tee.git
 cd claude-auto-tee
 ```
 
 **2. Make the hook executable:**
+
 ```bash
 chmod +x src/claude-auto-tee.sh
 ```
 
 **3. Install globally (recommended for all projects):**
+
 ```bash
 # Create Claude Code config directory
 mkdir -p ~/.claude
@@ -86,6 +89,7 @@ echo '{
 ```
 
 **4. Verify installation:**
+
 ```bash
 # Check hook is configured
 cat ~/.claude/settings.json
@@ -104,9 +108,11 @@ CLAUDE_AUTO_TEE_VERBOSE=true echo '{"tool":{"name":"Bash","input":{"command":"ec
 Claude Auto-Tee supports several environment variables for customization:
 
 #### `CLAUDE_AUTO_TEE_VERBOSE`
+
 **Purpose:** Enable detailed logging for debugging and monitoring  
 **Values:** `true` or `false` (default: `false`)  
 **Usage:**
+
 ```bash
 # Enable verbose mode globally
 export CLAUDE_AUTO_TEE_VERBOSE=true
@@ -122,9 +128,11 @@ CLAUDE_AUTO_TEE_VERBOSE=true claude
 - Cleanup operations
 
 #### `TMPDIR`, `TMP`, `TEMP`
+
 **Purpose:** Override default temporary directory location  
 **Priority Order:** `$TMPDIR` → `$TMP` → `$TEMP` → platform defaults  
 **Usage:**
+
 ```bash
 # Use custom temp directory
 export TMPDIR="/path/to/custom/temp"
@@ -223,9 +231,11 @@ brew install claude-auto-tee
 - No additional dependencies
 
 #### Windows (WSL)
+
 - Requires Windows Subsystem for Linux
 - Uses WSL's `/tmp/` directory
 - Install via WSL terminal:
+
 ```bash
 # In WSL terminal
 sudo apt update && sudo apt install git
@@ -282,6 +292,7 @@ TMPDIR=/tmp CLAUDE_AUTO_TEE_VERBOSE=true echo '{"tool":{"name":"Bash","input":{"
 ### Troubleshooting
 
 **Quick Diagnosis:**
+
 All errors include numeric codes (1-99) for precise identification. Enable verbose mode for detailed debugging:
 
 ```bash
@@ -294,6 +305,7 @@ export CLAUDE_AUTO_TEE_VERBOSE=true
 1. **[ERROR 1] Invalid input provided**
    - **Cause:** Malformed JSON or empty input
    - **Solution:** Check Claude Code hook configuration
+
    ```bash
    cat ~/.claude/settings.json  # Verify hook setup
    ```
@@ -301,6 +313,7 @@ export CLAUDE_AUTO_TEE_VERBOSE=true
 2. **[ERROR 10] No suitable temp directory found**
    - **Cause:** No writable temp directories available
    - **Solutions:**
+
    ```bash
    # Check temp directory permissions
    ls -la "${TMPDIR:-/tmp}"
@@ -316,6 +329,7 @@ export CLAUDE_AUTO_TEE_VERBOSE=true
 3. **[ERROR 20] Insufficient disk space**
    - **Cause:** Less than 100MB available in temp directory
    - **Solutions:**
+
    ```bash
    # Clean up old files
    rm -f /tmp/claude-*.log
@@ -328,6 +342,7 @@ export CLAUDE_AUTO_TEE_VERBOSE=true
    ```
 
 4. **"Permission denied"**
+
    ```bash
    chmod +x src/claude-auto-tee.sh
    ```
@@ -361,7 +376,8 @@ bash scripts/diagnose.sh
 - Process and file cleanup status
 
 **Example output:**
-```
+
+```text
 🔍 Claude Auto-Tee System Diagnostic
 =====================================
 
@@ -396,6 +412,7 @@ Temp Directory Configuration
    - Check that command doesn't already contain `tee`
 
 **Debug mode:**
+
 ```bash
 # Enable verbose debugging
 CLAUDE_AUTO_TEE_DEBUG=1 ./src/claude-auto-tee.sh
@@ -413,7 +430,7 @@ Claude Auto-Tee supports environment variable overrides for advanced customizati
 | `CLAUDE_AUTO_TEE_TEMP_DIR` | Override temp directory | Auto-detected | `export CLAUDE_AUTO_TEE_TEMP_DIR=/custom/temp` |
 | `CLAUDE_AUTO_TEE_CLEANUP_ON_SUCCESS` | Auto-cleanup temp files | `true` | `export CLAUDE_AUTO_TEE_CLEANUP_ON_SUCCESS=false` |
 | `CLAUDE_AUTO_TEE_TEMP_PREFIX` | Customize temp file prefix | `claude` | `export CLAUDE_AUTO_TEE_TEMP_PREFIX=debug` |
-| `CLAUDE_AUTO_TEE_MAX_SIZE` | Size limit hint (bytes) | None | `export CLAUDE_AUTO_TEE_MAX_SIZE=104857600` |
+| `CLAUDE_AUTO_TEE_MAX_SIZE` | Size limit for temp files (bytes) | 104857600 (100MB) | `export CLAUDE_AUTO_TEE_MAX_SIZE=52428800` |
 
 ### Usage Examples
 
@@ -434,6 +451,7 @@ export CLAUDE_AUTO_TEE_TEMP_PREFIX=project
 See [docs/ENVIRONMENT-VARIABLES.md](docs/ENVIRONMENT-VARIABLES.md) for detailed documentation.
 
 **Uninstall:**
+
 ```bash
 # Remove global configuration
 rm ~/.claude/settings.json
@@ -457,6 +475,7 @@ That's it. No pattern matching, no complex logic, no edge cases.
 ## Examples
 
 ### Basic Pipeline
+
 ```bash
 # Input command:
 find . -name "*.js" | wc -l
@@ -467,6 +486,7 @@ find . -name "*.js" 2>&1 | tee /tmp/claude-xyz.log | wc -l
 ```
 
 ### Complex Multi-stage Pipeline
+
 ```bash
 # Input command:
 cat large.log | grep ERROR | sort | uniq -c | head -10
@@ -477,6 +497,7 @@ cat large.log 2>&1 | tee /tmp/claude-xyz.log | grep ERROR | sort | uniq -c | hea
 ```
 
 ### Development Workflow
+
 ```bash
 # Build and show only last 10 lines
 npm run build 2>&1 | tail -10
@@ -489,6 +510,7 @@ cat /tmp/claude-1234567890.log | grep -i error
 ```
 
 ### Log Analysis
+
 ```bash
 # Show recent errors from large log
 tail -1000 /var/log/app.log | grep ERROR | head -20
@@ -498,6 +520,7 @@ tail -1000 /var/log/app.log | grep ERROR | head -20
 ```
 
 ### Performance Testing
+
 ```bash
 # Time a command and see summary
 time ./my-script.sh | grep "completed"
@@ -507,6 +530,7 @@ time ./my-script.sh | grep "completed"
 ```
 
 ### Data Processing
+
 ```bash
 # Process CSV and show summary
 cat data.csv | awk -F, '{sum+=$3} END {print "Total:", sum}' | head -1
@@ -663,6 +687,7 @@ From the expert debate conclusion:
 Having issues? We've got you covered:
 
 ### Quick Diagnosis
+
 ```bash
 # Run system diagnostic
 ./scripts/diagnose.sh
@@ -685,6 +710,7 @@ Having issues? We've got you covered:
 | Disk space issues | `rm -rf /tmp/claude-* && df -h /tmp` |
 
 ### Debug Mode
+
 ```bash
 # Enable detailed logging
 export CLAUDE_AUTO_TEE_DEBUG=1

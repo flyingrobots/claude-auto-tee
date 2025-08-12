@@ -14,7 +14,9 @@ source "${SCRIPT_DIR}/disk-space-check.sh"
 readonly VERBOSE_MODE="${CLAUDE_AUTO_TEE_VERBOSE:-false}"
 readonly CLEANUP_ON_SUCCESS="${CLAUDE_AUTO_TEE_CLEANUP_ON_SUCCESS:-true}"
 readonly TEMP_FILE_PREFIX="${CLAUDE_AUTO_TEE_TEMP_PREFIX:-claude}"
-readonly MAX_TEMP_FILE_SIZE="${CLAUDE_AUTO_TEE_MAX_SIZE:-}"
+# Default size limit: 100MB (100 * 1024 * 1024 = 104857600 bytes)
+readonly DEFAULT_MAX_TEMP_FILE_SIZE=104857600
+readonly MAX_TEMP_FILE_SIZE="${CLAUDE_AUTO_TEE_MAX_SIZE:-$DEFAULT_MAX_TEMP_FILE_SIZE}"
 
 # Verbose logging function
 log_verbose() {
@@ -53,6 +55,7 @@ EOF
     chmod +x "$cleanup_script" 2>/dev/null || true
     echo "$cleanup_script"
 }
+
 
 # Initial verbose mode detection
 log_verbose "Verbose mode enabled (CLAUDE_AUTO_TEE_VERBOSE=$VERBOSE_MODE)"
@@ -485,12 +488,18 @@ if echo "$command" | grep -q " | "; then
     log_verbose "Disk space check passed"
     clear_error_context
     
-    # Validate MAX_TEMP_FILE_SIZE override if set (P1.T003)
-    if [[ -n "$MAX_TEMP_FILE_SIZE" ]] && [[ "$MAX_TEMP_FILE_SIZE" =~ ^[0-9]+$ ]]; then
-        log_verbose "Max temp file size limit set: ${MAX_TEMP_FILE_SIZE} bytes"
-        # This will be enforced during command execution by the shell's ulimit or monitoring
+    # Validate and apply MAX_TEMP_FILE_SIZE limit (P1.T018)
+    if [[ "$MAX_TEMP_FILE_SIZE" =~ ^[0-9]+$ ]]; then
+        if [[ "$MAX_TEMP_FILE_SIZE" -gt 0 ]]; then
+            log_verbose "Max temp file size limit: ${MAX_TEMP_FILE_SIZE} bytes ($(($MAX_TEMP_FILE_SIZE / 1024 / 1024))MB)"
+            # Size limit will be enforced during command execution
+        else
+            log_verbose "Warning: MAX_TEMP_FILE_SIZE must be greater than 0, using default: $DEFAULT_MAX_TEMP_FILE_SIZE bytes"
+            MAX_TEMP_FILE_SIZE="$DEFAULT_MAX_TEMP_FILE_SIZE"
+        fi
     elif [[ -n "$MAX_TEMP_FILE_SIZE" ]]; then
-        log_verbose "Warning: Invalid MAX_TEMP_FILE_SIZE value '$MAX_TEMP_FILE_SIZE', ignoring"
+        log_verbose "Warning: Invalid MAX_TEMP_FILE_SIZE value '$MAX_TEMP_FILE_SIZE', using default: $DEFAULT_MAX_TEMP_FILE_SIZE bytes"
+        MAX_TEMP_FILE_SIZE="$DEFAULT_MAX_TEMP_FILE_SIZE"
     fi
     
     # Generate unique temp file and cleanup script (P1.T013)
@@ -525,15 +534,19 @@ if echo "$command" | grep -q " | "; then
     log_verbose "Split command - before pipe: $before_pipe"
     log_verbose "Split command - after pipe: $after_pipe"
     
-    # Construct modified command with tee and cleanup (P1.T013)
+    # Construct modified command with tee, size limits, and cleanup (P1.T013, P1.T018)
     # Only add 2>&1 if not already present
     if echo "$before_pipe" | grep -q "2>&1"; then
-        modified_command="$before_pipe | tee \"$temp_file\" | $after_pipe"
-        log_verbose "Command already has 2>&1, tee injection: $modified_command"
+        base_tee_command="$before_pipe | head -c $MAX_TEMP_FILE_SIZE | tee \"$temp_file\""
+        log_verbose "Command already has 2>&1, tee with size limit: $base_tee_command"
     else
-        modified_command="$before_pipe 2>&1 | tee \"$temp_file\" | $after_pipe"
-        log_verbose "Added 2>&1 and tee injection: $modified_command"
+        base_tee_command="$before_pipe 2>&1 | head -c $MAX_TEMP_FILE_SIZE | tee \"$temp_file\""
+        log_verbose "Added 2>&1 and tee with size limit: $base_tee_command"
     fi
+    
+    # Add size warning when truncation occurs
+    modified_command="{ $base_tee_command; SIZE_CHECK=\$(wc -c < \"$temp_file\" 2>/dev/null || echo 0); if [[ \$SIZE_CHECK -ge $MAX_TEMP_FILE_SIZE ]]; then echo \"[CLAUDE-AUTO-TEE] WARNING: Output truncated at $((MAX_TEMP_FILE_SIZE / 1024 / 1024))MB limit\" >&2; fi; } | $after_pipe"
+    log_verbose "Added size monitoring and truncation warning: $modified_command"
     
     # Add cleanup on successful completion (P1.T013)
     # Use CLEANUP_ON_SUCCESS environment variable override (P1.T003)
