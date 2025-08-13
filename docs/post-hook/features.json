@@ -1,0 +1,225 @@
+{
+  "generated": {
+    "by": "T.A.S.K.S v1",
+    "timestamp": "2025-01-13T00:00:00Z",
+    "contentHash": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9"
+  },
+  "features": [
+    {
+      "id": "F001",
+      "title": "Core PostToolUse Parser",
+      "description": "Extract capture file paths from tool_response stderr messages after command execution completes.",
+      "priority": "critical",
+      "source_evidence": [
+        {
+          "quote": "Parse tool_response to extract tee output paths from stderr",
+          "loc": {
+            "start": 311,
+            "end": 372
+          },
+          "section": "Layer 1: Structured Capture Registry",
+          "startLine": 11,
+          "endLine": 12
+        }
+      ]
+    },
+    {
+      "id": "F002", 
+      "title": "Capture Registry System",
+      "description": "Persistent JSON registry at ~/.claude/captures.json storing capture metadata with atomic writes and rotation.",
+      "priority": "critical",
+      "source_evidence": [
+        {
+          "quote": "Write to JSON registry at ~/.claude/captures.json",
+          "loc": {
+            "start": 375,
+            "end": 425
+          },
+          "section": "Layer 1: Structured Capture Registry",
+          "startLine": 13,
+          "endLine": 13
+        }
+      ]
+    },
+    {
+      "id": "F003",
+      "title": "Environment Variable Bridge",
+      "description": "Export capture information through environment variables for immediate Claude access.",
+      "priority": "critical",
+      "source_evidence": [
+        {
+          "quote": "Set environment variable pointing to latest captures",
+          "loc": {
+            "start": 517,
+            "end": 570
+          },
+          "section": "Layer 1: Structured Capture Registry",
+          "startLine": 15,
+          "endLine": 15
+        }
+      ]
+    },
+    {
+      "id": "F004",
+      "title": "Context Injection Interface",
+      "description": "Generate formatted context blocks with visual delimiters that appear in Claude's next interaction.",
+      "priority": "high",
+      "source_evidence": [
+        {
+          "quote": "Generate formatted context blocks that appear in next Claude interaction",
+          "loc": {
+            "start": 589,
+            "end": 662
+          },
+          "section": "Layer 2: Immediate Context Injection",
+          "startLine": 18,
+          "endLine": 18
+        }
+      ]
+    },
+    {
+      "id": "F005",
+      "title": "Structured Stderr Markers",
+      "description": "Enhanced PreToolUse markers to improve capture path extraction reliability.",
+      "priority": "medium",
+      "source_evidence": [
+        {
+          "quote": "Add structured stderr markers in PreToolUse",
+          "loc": {
+            "start": 1935,
+            "end": 1978
+          },
+          "section": "Phase 2: Enhanced Reliability",
+          "startLine": 42,
+          "endLine": 42
+        }
+      ]
+    },
+    {
+      "id": "F006",
+      "title": "Cross-Platform Support",
+      "description": "Ensure compatibility across Linux, macOS, and Windows (WSL) environments.",
+      "priority": "high",
+      "source_evidence": [
+        {
+          "quote": "Test cross-platform compatibility",
+          "loc": {
+            "start": 2081,
+            "end": 2115
+          },
+          "section": "Phase 2: Enhanced Reliability",
+          "startLine": 45,
+          "endLine": 45
+        }
+      ]
+    },
+    {
+      "id": "F007",
+      "title": "Registry Robustness",
+      "description": "Add file locking, compression, and indexing for concurrent access and scalability.",
+      "priority": "medium",
+      "source_evidence": [
+        {
+          "quote": "Implement robust JSON registry with rotation",
+          "loc": {
+            "start": 2000,
+            "end": 2045
+          },
+          "section": "Phase 2: Enhanced Reliability",
+          "startLine": 43,
+          "endLine": 43
+        }
+      ]
+    },
+    {
+      "id": "F008",
+      "title": "Visual Enhancement",
+      "description": "Rich visual formatting with syntax highlighting and metadata display.",
+      "priority": "low",
+      "source_evidence": [
+        {
+          "quote": "Add visual context blocks with formatting",
+          "loc": {
+            "start": 2049,
+            "end": 2091
+          },
+          "section": "Phase 2: Enhanced Reliability",
+          "startLine": 44,
+          "endLine": 44
+        }
+      ]
+    },
+    {
+      "id": "F009",
+      "title": "Dependency Tracking",
+      "description": "Track relationships between commands to detect invalidation cascades.",
+      "priority": "low",
+      "source_evidence": [
+        {
+          "quote": "Add dependency tracking",
+          "loc": {
+            "start": 2135,
+            "end": 2159
+          },
+          "section": "Phase 3: Intelligence Layer",
+          "startLine": 48,
+          "endLine": 48
+        }
+      ]
+    },
+    {
+      "id": "F010",
+      "title": "Freshness Intelligence",
+      "description": "Score capture freshness based on age and system state changes.",
+      "priority": "low",
+      "source_evidence": [
+        {
+          "quote": "Implement freshness scoring",
+          "loc": {
+            "start": 2163,
+            "end": 2191
+          },
+          "section": "Phase 3: Intelligence Layer",
+          "startLine": 49,
+          "endLine": 49
+        }
+      ]
+    },
+    {
+      "id": "F011",
+      "title": "Invalidation Engine",
+      "description": "Rule-based system for automatic capture invalidation.",
+      "priority": "low",
+      "source_evidence": [
+        {
+          "quote": "Create invalidation rules",
+          "loc": {
+            "start": 2195,
+            "end": 2221
+          },
+          "section": "Phase 3: Intelligence Layer",
+          "startLine": 50,
+          "endLine": 50
+        }
+      ]
+    },
+    {
+      "id": "F012",
+      "title": "Semantic Enhancement",
+      "description": "Extract and index semantic information from captures for better searchability.",
+      "priority": "low",
+      "source_evidence": [
+        {
+          "quote": "Add semantic enhancement",
+          "loc": {
+            "start": 2225,
+            "end": 2250
+          },
+          "section": "Phase 3: Intelligence Layer",
+          "startLine": 51,
+          "endLine": 51
+        }
+      ]
+    }
+  ]
+}

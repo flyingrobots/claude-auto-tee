@@ -1,0 +1,240 @@
+{
+  "$id": "https://claude-auto-tee.com/schemas/registry.json",
+  "title": "Claude Auto-Tee Capture Registry",
+  "description": "JSON schema for the capture registry that tracks tool output captures with metadata and validation",
+  "type": "object",
+  "required": ["version", "lastModified", "totalCaptures", "captures"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of the registry schema format",
+      "examples": ["1.0.0", "1.2.3"]
+    },
+    "lastModified": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of the last registry modification",
+      "examples": ["2025-01-13T10:30:45.123Z"]
+    },
+    "totalCaptures": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10000,
+      "description": "Total number of capture entries (for quick validation and size limits)",
+      "examples": [0, 42, 1337]
+    },
+    "captures": {
+      "type": "array",
+      "maxItems": 10000,
+      "description": "Array of captured tool outputs with metadata",
+      "items": {
+        "type": "object",
+        "required": ["path", "command", "timestamp", "size", "hash"],
+        "additionalProperties": true,
+        "description": "Individual capture record with core metadata and extensibility",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "description": "Absolute file path to the captured output (cross-platform compatible)",
+            "pattern": "^(/|[A-Za-z]:\\\\|\\\\\\\\).+",
+            "examples": [
+              "/tmp/capture_20250113_103045.txt",
+              "/Users/dev/.claude/captures/cmd_output.log",
+              "C:\\Users\\Dev\\AppData\\Local\\Claude\\capture.txt",
+              "\\\\server\\share\\captures\\output.log"
+            ]
+          },
+          "command": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8192,
+            "description": "The command that generated this capture",
+            "examples": [
+              "ls -la",
+              "npm test",
+              "git status --porcelain",
+              "docker ps -a"
+            ]
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp when the capture was created",
+            "examples": ["2025-01-13T10:30:45.123Z"]
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1073741824,
+            "description": "File size in bytes (max 1GB for reasonable limits)",
+            "examples": [0, 1024, 512000]
+          },
+          "hash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "SHA-256 hash of the file contents for integrity verification",
+            "examples": [
+              "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2"
+            ]
+          },
+          "toolName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Name of the tool that generated the capture (optional metadata)",
+            "examples": ["Bash", "Edit", "Write", "Grep"]
+          },
+          "toolVersion": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+(\\.\\d+)?$",
+            "description": "Version of the tool (optional metadata)",
+            "examples": ["1.0", "2.1.3"]
+          },
+          "exitCode": {
+            "type": ["integer", "null"],
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "description": "Exit code of the command (null if not applicable)",
+            "examples": [0, 1, 127, null]
+          },
+          "duration": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 86400,
+            "description": "Command execution duration in seconds (max 24 hours)",
+            "examples": [0.123, 45.67, 300.0]
+          },
+          "workingDirectory": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "^(/|[A-Za-z]:\\\\|\\\\\\\\).+",
+            "description": "Working directory when command was executed (optional)",
+            "examples": [
+              "/Users/dev/project",
+              "C:\\Users\\Dev\\Project",
+              "/tmp"
+            ]
+          },
+          "environment": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 100,
+            "description": "Relevant environment variables at capture time (optional)",
+            "examples": [
+              {"NODE_ENV": "development", "PATH": "/usr/bin:/bin"},
+              {}
+            ]
+          },
+          "tags": {
+            "type": "array",
+            "maxItems": 20,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 50,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            },
+            "description": "User-defined tags for categorization (optional)",
+            "examples": [
+              ["test", "build", "ci"],
+              ["debug", "performance"],
+              []
+            ]
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Additional extensible metadata for future enhancements",
+            "examples": [
+              {"source": "claude-code", "session": "abc123"},
+              {"priority": "high", "category": "deployment"}
+            ]
+          }
+        }
+      }
+    },
+    "stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional registry statistics for monitoring and optimization",
+      "properties": {
+        "totalSize": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total size of all captured files in bytes"
+        },
+        "averageSize": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Average file size in bytes"
+        },
+        "oldestCapture": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of the oldest capture"
+        },
+        "newestCapture": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of the newest capture"
+        },
+        "commandFrequency": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "Frequency count of different commands",
+          "maxProperties": 1000
+        }
+      }
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional configuration settings for registry behavior",
+      "properties": {
+        "maxCaptures": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "default": 1000,
+          "description": "Maximum number of captures to retain"
+        },
+        "maxFileSize": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 1073741824,
+          "default": 10485760,
+          "description": "Maximum file size to capture in bytes (default 10MB)"
+        },
+        "retentionDays": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 365,
+          "default": 30,
+          "description": "Number of days to retain captures"
+        },
+        "compressionEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether to enable compression for large files"
+        },
+        "autoCleanup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to automatically clean up old captures"
+        }
+      }
+    }
+  }
+}

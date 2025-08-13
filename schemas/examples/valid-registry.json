@@ -1,0 +1,87 @@
+{
+  "version": "1.0.0",
+  "lastModified": "2025-01-13T15:30:45.123Z",
+  "totalCaptures": 3,
+  "captures": [
+    {
+      "path": "/tmp/claude_capture_20250113_153045_001.txt",
+      "command": "ls -la /Users/dev/project",
+      "timestamp": "2025-01-13T15:30:45.123Z",
+      "size": 2048,
+      "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "toolName": "Bash",
+      "toolVersion": "1.0",
+      "exitCode": 0,
+      "duration": 0.123,
+      "workingDirectory": "/Users/dev/project",
+      "environment": {
+        "NODE_ENV": "development",
+        "PATH": "/usr/local/bin:/usr/bin:/bin"
+      },
+      "tags": ["filesystem", "directory-listing"],
+      "metadata": {
+        "source": "claude-code",
+        "session": "abc123def456",
+        "context": "project-exploration"
+      }
+    },
+    {
+      "path": "/Users/dev/.claude/captures/npm_test_output.log",
+      "command": "npm test",
+      "timestamp": "2025-01-13T15:25:30.456Z",
+      "size": 15360,
+      "hash": "d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2",
+      "toolName": "Bash",
+      "toolVersion": "1.0",
+      "exitCode": 0,
+      "duration": 12.45,
+      "workingDirectory": "/Users/dev/project",
+      "environment": {
+        "NODE_ENV": "test",
+        "CI": "false"
+      },
+      "tags": ["testing", "npm", "success"],
+      "metadata": {
+        "source": "claude-code",
+        "session": "abc123def456",
+        "testSuite": "unit-tests",
+        "coverage": 95.2
+      }
+    },
+    {
+      "path": "C:\\Users\\Dev\\Claude\\capture_git_status.txt",
+      "command": "git status --porcelain",
+      "timestamp": "2025-01-13T15:20:15.789Z",
+      "size": 512,
+      "hash": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+      "toolName": "Bash",
+      "toolVersion": "1.0",
+      "exitCode": 0,
+      "duration": 0.087,
+      "workingDirectory": "C:\\Users\\Dev\\Project",
+      "tags": ["git", "status", "version-control"],
+      "metadata": {
+        "source": "claude-code",
+        "platform": "windows"
+      }
+    }
+  ],
+  "stats": {
+    "totalSize": 17920,
+    "averageSize": 5973.33,
+    "oldestCapture": "2025-01-13T15:20:15.789Z",
+    "newestCapture": "2025-01-13T15:30:45.123Z",
+    "commandFrequency": {
+      "ls": 1,
+      "npm test": 1,
+      "git status": 1
+    }
+  },
+  "config": {
+    "maxCaptures": 1000,
+    "maxFileSize": 10485760,
+    "retentionDays": 30,
+    "compressionEnabled": false,
+    "autoCleanup": true
+  }
+}

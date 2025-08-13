@@ -2,7 +2,11 @@
   "hooks": {
     "preToolUse": [
       {
-        "command": "./scripts/hooks/pre-tool-use.sh",
+        "command": "/Users/james/.claude/scripts/hooks/pre-tool-use.sh",
+        "matchers": ["Bash", "Edit", "Write", "MultiEdit"]
+      },
+      {
+        "command": "/Users/james/git/claude-auto-tee/src/claude-auto-tee.sh",
         "matchers": ["Bash", "Edit", "Write", "MultiEdit"]
       }
     ]
