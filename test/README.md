@@ -67,6 +67,15 @@ Behavior in continuous integration environments:
 
 **Run**: `npm run test:ci`
 
+### 7. Platform-Specific Tests (`test/platform/`)
+**P1.T006 IMPLEMENTATION** - Cross-platform compatibility validation:
+- macOS-specific tests (SIP, Homebrew, extended attributes)
+- Linux-specific tests (SELinux, package managers, containers)
+- Windows WSL tests (interop, filesystem access, path handling)
+- Cross-platform edge cases and compatibility
+
+**Run**: `npm run test:platform`
+
 ## Docker Testing
 
 ### Cross-Platform Testing
