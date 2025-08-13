@@ -10,6 +10,7 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/error-codes.sh"
 source "${SCRIPT_DIR}/disk-space-check.sh"
 source "${SCRIPT_DIR}/path-utils.sh"
+source "${SCRIPT_DIR}/markers/pretooluse-markers.sh"
 
 # Environment variable overrides (P1.T003)
 readonly VERBOSE_MODE="${CLAUDE_AUTO_TEE_VERBOSE:-false}"
@@ -935,6 +936,12 @@ if [[ "$pipe_count" -gt 0 ]]; then
     clear_error_context
     log_verbose "Selected temp directory: $temp_dir"
     
+    # Inject PreToolUse marker early (before temp file creation) - P2.T001
+    log_verbose "Injecting PreToolUse capture marker (before temp file creation)"
+    inject_pretooluse_marker "$command" "$temp_dir" "$TEMP_FILE_PREFIX" || {
+        log_verbose "Warning: Failed to inject PreToolUse marker - continuing without early marker"
+    }
+    
     # Check disk space before proceeding (P1.T017, P1.T019)
     set_error_context "Checking disk space for command execution"
     log_verbose "Checking disk space for command execution..."
@@ -1013,6 +1020,13 @@ if [[ "$pipe_count" -gt 0 ]]; then
     log_verbose "Generated temp file: $temp_file"
     log_verbose "Generated cleanup script: $cleanup_script"
     
+    # Legacy marker injection for PostToolUse hook compatibility (P2.T001)
+    # Note: PreToolUse marker was already injected earlier with predicted path
+    log_verbose "Injecting additional capture start marker for PostToolUse hook (legacy compatibility)"
+    inject_capture_start_marker "$temp_file" || {
+        log_verbose "Warning: Failed to inject legacy capture start marker - continuing without additional markers"
+    }
+    
     # Monitor resource usage and provide warnings (P1.T022)
     monitor_resource_usage "$temp_dir"
     
@@ -1052,11 +1066,11 @@ if [[ "$pipe_count" -gt 0 ]]; then
     final_command="$modified_command"
     
     if [[ "$CLEANUP_ON_SUCCESS" == "true" ]] && [[ -n "$cleanup_script" ]] && [[ -f "$cleanup_script" ]]; then
-        cleanup_command="source \"$cleanup_script\" && { $final_command; } && { echo \"Full output saved to: $temp_file\"; cleanup_temp_file \"$temp_file\"; rm -f \"$cleanup_script\" 2>/dev/null || true; } || { echo \"Command failed - temp file preserved: $temp_file\"; rm -f \"$cleanup_script\" 2>/dev/null || true; }"
-        log_verbose "Added cleanup logic for successful completion (CLEANUP_ON_SUCCESS=$CLEANUP_ON_SUCCESS)"
+        cleanup_command="source \"$cleanup_script\" && { $final_command; } && { echo \"Full output saved to: $temp_file\"; source \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" && inject_capture_end_marker \"$temp_file\" 2>/dev/null || true; cleanup_temp_file \"$temp_file\"; rm -f \"$cleanup_script\" 2>/dev/null || true; } || { echo \"Command failed - temp file preserved: $temp_file\"; source \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" && inject_capture_end_marker \"$temp_file\" 2>/dev/null || true; rm -f \"$cleanup_script\" 2>/dev/null || true; }"
+        log_verbose "Added cleanup logic with end markers for successful completion (CLEANUP_ON_SUCCESS=$CLEANUP_ON_SUCCESS)"
     else
         # No cleanup or cleanup disabled - preserve temp file
-        cleanup_command="{ $final_command; } && echo \"Full output saved to: $temp_file\" || echo \"Command failed - temp file preserved: $temp_file\""
+        cleanup_command="{ $final_command; } && { echo \"Full output saved to: $temp_file\"; source \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" && inject_capture_end_marker \"$temp_file\" 2>/dev/null || true; } || { echo \"Command failed - temp file preserved: $temp_file\"; source \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" && inject_capture_end_marker \"$temp_file\" 2>/dev/null || true; }"
         if [[ "$CLEANUP_ON_SUCCESS" != "true" ]]; then
             log_verbose "Cleanup disabled via CLAUDE_AUTO_TEE_CLEANUP_ON_SUCCESS=$CLEANUP_ON_SUCCESS"
         else
