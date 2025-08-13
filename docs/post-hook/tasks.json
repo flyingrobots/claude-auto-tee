@@ -1,0 +1,966 @@
+{
+  "meta": {
+    "min_confidence": 0.7,
+    "notes": "Tasks organized by three implementation phases: P1 (MVP Week 1), P2 (Enhanced Week 2), P3 (Intelligence Week 3+)",
+    "autonormalization": {
+      "split": [],
+      "merged": []
+    }
+  },
+  "generated": {
+    "by": "T.A.S.K.S v1",
+    "timestamp": "2025-01-13T00:00:00Z",
+    "contentHash": "b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0"
+  },
+  "tasks": [
+    {
+      "id": "P1.T001",
+      "feature_id": "F001",
+      "title": "Implement capture path parser",
+      "description": "Create parser to extract 'Full output saved to: PATH' from PostToolUse tool_response",
+      "category": "implementation",
+      "skillsRequired": ["javascript", "regex"],
+      "duration": {
+        "optimistic": 2,
+        "mostLikely": 3,
+        "pessimistic": 5
+      },
+      "durationUnits": "hours",
+      "interfaces_produced": ["PathParser:v1"],
+      "interfaces_consumed": [],
+      "acceptance_checks": [
+        {
+          "type": "command",
+          "cmd": "npm test -- parser",
+          "expect": {
+            "passRateGte": 0.95
+          }
+        }
+      ],
+      "source_evidence": [
+        {
+          "quote": "Extract capture paths from tool_response stderr",
+          "loc": {
+            "start": 1125,
+            "end": 1173
+          },
+          "section": "PostToolUse Hook Parser",
+          "startLine": 37,
+          "endLine": 37
+        }
+      ],
+      "contentHash": "p1t001hash"
+    },
+    {
+      "id": "P1.T002",
+      "feature_id": "F002",
+      "title": "Create registry schema",
+      "description": "Define JSON schema for capture registry with metadata fields",
+      "category": "foundation",
+      "skillsRequired": ["json-schema", "architecture"],
+      "duration": {
+        "optimistic": 1,
+        "mostLikely": 2,
+        "pessimistic": 3
+      },
+      "durationUnits": "hours",
+      "interfaces_produced": ["RegistrySchema:v1"],
+      "interfaces_consumed": [],
+      "acceptance_checks": [
+        {
+          "type": "artifact",
+          "path": "schemas/registry.json",
+          "expect": {
+            "exists": true
+          }
+        }
+      ],
+      "source_evidence": [
+        {
+          "quote": "Schema: {captures: [{path, command, timestamp, size, hash}]}",
+          "loc": {
+            "start": 1395,
+            "end": 1460
+          },
+          "section": "JSON Registry Manager",
+          "startLine": 45,
+          "endLine": 45
+        }
+      ],
+      "contentHash": "p1t002hash"
+    },
+    {
+      "id": "P1.T003",
+      "feature_id": "F002",
+      "title": "Build registry manager",
+      "description": "Implement CRUD operations for registry with atomic writes",
+      "category": "implementation",
+      "skillsRequired": ["javascript", "filesystem"],
+      "duration": {
+        "optimistic": 3,
+        "mostLikely": 5,
+        "pessimistic": 7
+      },
+      "durationUnits": "hours",
+      "interfaces_produced": ["RegistryManager:v1"],
+      "interfaces_consumed": ["RegistrySchema:v1"],
+      "acceptance_checks": [
+        {
+          "type": "command",
+          "cmd": "npm test -- registry",
+          "expect": {
+            "passRateGte": 0.95
+          }
+        }
+      ],
+      "source_evidence": [
+        {
+          "quote": "Create/update ~/.claude/captures.json atomically",
+          "loc": {
+            "start": 1344,
+            "end": 1393
+          },
+          "section": "JSON Registry Manager",
+          "startLine": 44,
+          "endLine": 44
+        }
+      ],
+      "contentHash": "p1t003hash"
+    },
+    {
+      "id": "P1.T004",
+      "feature_id": "F003",
+      "title": "Implement environment exporter",
+      "description": "Create module to set CLAUDE_LAST_CAPTURE and CLAUDE_CAPTURES env vars",
+      "category": "implementation",
+      "skillsRequired": ["javascript", "shell"],
+      "duration": {
+        "optimistic": 2,
+        "mostLikely": 3,
+        "pessimistic": 4
+      },
+      "durationUnits": "hours",
+      "interfaces_produced": ["EnvExporter:v1"],
+      "interfaces_consumed": [],
+      "acceptance_checks": [
+        {
+          "type": "command",
+          "cmd": "test -n \"$CLAUDE_LAST_CAPTURE\"",
+          "expect": {
+            "passRateGte": 1.0
+          }
+        }
+      ],
+      "source_evidence": [
+        {
+          "quote": "Set CLAUDE_LAST_CAPTURE for immediate access",
+          "loc": {
+            "start": 1583,
+            "end": 1628
+          },
+          "section": "Environment Variable Export",
+          "startLine": 51,
+          "endLine": 51
+        }
+      ],
+      "contentHash": "p1t004hash"
+    },
+    {
+      "id": "P1.T005",
+      "feature_id": "F004",
+      "title": "Design basic context format",
+      "description": "Create simple text format for context blocks",
+      "category": "foundation",
+      "skillsRequired": ["ux", "documentation"],
+      "duration": {
+        "optimistic": 1,
+        "mostLikely": 2,
+        "pessimistic": 3
+      },
+      "durationUnits": "hours",
+      "interfaces_produced": ["BasicContextFormat:v1"],
+      "interfaces_consumed": [],
+      "acceptance_checks": [
+        {
+          "type": "artifact",
+          "path": "docs/context-format.md",
+          "expect": {
+            "exists": true
+          }
+        }
+      ],
+      "source_evidence": [
+        {
+          "quote": "Create simple text blocks with capture info",
+          "loc": {
+            "start": 1785,
+            "end": 1829
+          },
+          "section": "Basic Context Generation",
+          "startLine": 57,
+          "endLine": 57
+        }
+      ],
+      "contentHash": "p1t005hash"
+    },
+    {
+      "id": "P1.T006",
+      "feature_id": "F004",
+      "title": "Build context generator",
+      "description": "Generate basic context blocks from capture metadata",
+      "category": "implementation",
+      "skillsRequired": ["javascript", "formatting"],
+      "duration": {
+        "optimistic": 2,
+        "mostLikely": 3,
+        "pessimistic": 5
+      },
+      "durationUnits": "hours",
+      "interfaces_produced": ["ContextGenerator:v1"],
+      "interfaces_consumed": ["BasicContextFormat:v1"],
+      "acceptance_checks": [
+        {
+          "type": "command",
+          "cmd": "npm test -- context",
+          "expect": {
+            "passRateGte": 0.95
+          }
+        }
+      ],
+      "source_evidence": [
+        {
+          "quote": "Format: '📝 OUTPUT CAPTURED: /path/to/file'",
+          "loc": {
+            "start": 1831,
+            "end": 1878
+          },
+          "section": "Basic Context Generation",
+          "startLine": 58,
+          "endLine": 58
+        }
+      ],
+      "contentHash": "p1t006hash"
+    },
+    {
+      "id": "P1.T007",
+      "feature_id": "F001",
+      "title": "Create PostToolUse hook handler",
+      "description": "Integrate parser, registry, env vars, and context into single handler",
+      "category": "integration",
+      "skillsRequired": ["javascript", "hooks"],
+      "duration": {
+        "optimistic": 3,
+        "mostLikely": 5,
+        "pessimistic": 8
+      },
+      "durationUnits": "hours",
+      "interfaces_produced": ["PostToolUseHandler:v1"],
+      "interfaces_consumed": ["PathParser:v1", "RegistryManager:v1", "EnvExporter:v1", "ContextGenerator:v1"],
+      "acceptance_checks": [
+        {
+          "type": "command",
+          "cmd": "npm test -- integration",
+          "expect": {
+            "passRateGte": 0.95
+          }
+        }
+      ],
+      "source_evidence": [
+        {
+          "quote": "PostToolUse hook pseudocode",
+          "loc": {
+            "start": 1056,
+            "end": 1084
+          },
+          "section": "Phase 1: Minimum Viable Implementation",
+          "startLine": 33,
+          "endLine": 33
+        }
+      ],
+      "contentHash": "p1t007hash"
+    },
+    {
+      "id": "P2.T001",
+      "feature_id": "F005",
+      "title": "Add PreToolUse markers",
+      "description": "Modify PreToolUse to inject structured markers in stderr",
+      "category": "implementation",
+      "skillsRequired": ["bash", "hooks"],
+      "duration": {
+        "optimistic": 2,
+        "mostLikely": 3,
+        "pessimistic": 4
+      },
+      "durationUnits": "hours",
+      "interfaces_produced": ["MarkerFormat:v1"],
+      "interfaces_consumed": [],
+      "acceptance_checks": [
+        {
+          "type": "command",
+          "cmd": "bash test-markers.sh",
+          "expect": {
+            "passRateGte": 1.0
+          }
+        }
+      ],
+      "source_evidence": [
+        {
+          "quote": "Format: '###CLAUDE-CAPTURE-START### PATH ###CLAUDE-CAPTURE-END###'",
+          "loc": {
+            "start": 1996,
+            "end": 2063
+          },
+          "section": "Structured Stderr Markers",
+          "startLine": 76,
+          "endLine": 76
+        }
+      ],
+      "contentHash": "p2t001hash"
+    },
+    {
+      "id": "P2.T002",
+      "feature_id": "F007",
+      "title": "Implement file locking",
+      "description": "Add atomic file operations with locking for concurrent access",
+      "category": "implementation",
+      "skillsRequired": ["filesystem", "concurrency"],
+      "duration": {
+        "optimistic": 2,
+        "mostLikely": 4,
+        "pessimistic": 6
+      },
+      "durationUnits": "hours",
+      "interfaces_produced": ["FileLocking:v1"],
+      "interfaces_consumed": ["RegistryManager:v1"],
+      "acceptance_checks": [
+        {
+          "type": "metric",
+          "name": "concurrent_write_safety",
+          "expect": {
+            "lte": 100
+          }
+        }
+      ],
+      "source_evidence": [
+        {
+          "quote": "Implement file locking for concurrent access",
+          "loc": {
+            "start": 2206,
+            "end": 2251
+          },
+          "section": "Robust Registry Implementation",
+          "startLine": 83,
+          "endLine": 83
+        }
+      ],
+      "contentHash": "p2t002hash"
+    },
+    {
+      "id": "P2.T003",
+      "feature_id": "F007",
+      "title": "Add registry compression",
+      "description": "Implement compression for large registry files",
+      "category": "optimization",
+      "skillsRequired": ["compression", "javascript"],
+      "duration": {
+        "optimistic": 2,
+        "mostLikely": 3,
+        "pessimistic": 4
+      },
+      "durationUnits": "hours",
+      "interfaces_produced": ["Compression:v1"],
+      "interfaces_consumed": ["RegistryManager:v1"],
+      "acceptance_checks": [
+        {
+          "type": "metric",
+          "name": "compression_ratio",
+          "expect": {
+            "lte": 0.5
+          }
+        }
+      ],
+      "source_evidence": [
+        {
+          "quote": "Add compression for large registries",
+          "loc": {
+            "start": 2255,
+            "end": 2293
+          },
+          "section": "Robust Registry Implementation",
+          "startLine": 84,
+          "endLine": 84
+        }
+      ],
+      "contentHash": "p2t003hash"
+    },
+    {
+      "id": "P2.T004",
+      "feature_id": "F008",
+      "title": "Enhance visual formatting",
+      "description": "Add borders and syntax highlighting to context blocks",
+      "category": "optimization",
+      "skillsRequired": ["formatting", "ux"],
+      "duration": {
+        "optimistic": 2,
+        "mostLikely": 3,
+        "pessimistic": 4
+      },
+      "durationUnits": "hours",
+      "interfaces_produced": ["EnhancedFormat:v1"],
+      "interfaces_consumed": ["BasicContextFormat:v1"],
+      "acceptance_checks": [
+        {
+          "type": "artifact",
+          "path": "src/enhanced-formatter.js",
+          "expect": {
+            "exists": true
+          }
+        }
+      ],
+      "source_evidence": [
+        {
+          "quote": "Enhanced visual blocks with borders",
+          "loc": {
+            "start": 2352,
+            "end": 2388
+          },
+          "section": "Visual Context Formatting",
+          "startLine": 89,
+          "endLine": 89
+        }
+      ],
+      "contentHash": "p2t004hash"
+    },
+    {
+      "id": "P2.T005",
+      "feature_id": "F006",
+      "title": "Test cross-platform paths",
+      "description": "Validate path handling on Linux, macOS, Windows (WSL)",
+      "category": "integration",
+      "skillsRequired": ["testing", "cross-platform"],
+      "duration": {
+        "optimistic": 3,
+        "mostLikely": 4,
+        "pessimistic": 6
+      },
+      "durationUnits": "hours",
+      "interfaces_produced": [],
+      "interfaces_consumed": ["PostToolUseHandler:v1"],
+      "acceptance_checks": [
+        {
+          "type": "command",
+          "cmd": "npm test -- platform",
+          "expect": {
+            "passRateGte": 1.0
+          }
+        }
+      ],
+      "source_evidence": [
+        {
+          "quote": "Test on Linux, macOS, Windows (WSL)",
+          "loc": {
+            "start": 2516,
+            "end": 2552
+          },
+          "section": "Cross-Platform Testing",
+          "startLine": 100,
+          "endLine": 100
+        }
+      ],
+      "contentHash": "p2t005hash"
+    },
+    {
+      "id": "P2.T006",
+      "feature_id": "F006",
+      "title": "Handle Unicode paths",
+      "description": "Ensure proper handling of Unicode characters in file paths",
+      "category": "implementation",
+      "skillsRequired": ["unicode", "javascript"],
+      "duration": {
+        "optimistic": 2,
+        "mostLikely": 3,
+        "pessimistic": 4
+      },
+      "durationUnits": "hours",
+      "interfaces_produced": ["UnicodeHandler:v1"],
+      "interfaces_consumed": [],
+      "acceptance_checks": [
+        {
+          "type": "command",
+          "cmd": "npm test -- unicode",
+          "expect": {
+            "passRateGte": 1.0
+          }
+        }
+      ],
+      "source_evidence": [
+        {
+          "quote": "Validate Unicode handling",
+          "loc": {
+            "start": 2625,
+            "end": 2652
+          },
+          "section": "Cross-Platform Testing",
+          "startLine": 103,
+          "endLine": 103
+        }
+      ],
+      "contentHash": "p2t006hash"
+    },
+    {
+      "id": "P3.T001",
+      "feature_id": "F009",
+      "title": "Design dependency schema",
+      "description": "Create data model for command relationships",
+      "category": "foundation",
+      "skillsRequired": ["data-modeling", "architecture"],
+      "duration": {
+        "optimistic": 2,
+        "mostLikely": 3,
+        "pessimistic": 4
+      },
+      "durationUnits": "hours",
+      "interfaces_produced": ["DependencySchema:v1"],
+      "interfaces_consumed": [],
+      "acceptance_checks": [
+        {
+          "type": "artifact",
+          "path": "schemas/dependency.json",
+          "expect": {
+            "exists": true
+          }
+        }
+      ],
+      "source_evidence": [
+        {
+          "quote": "Track command relationships",
+          "loc": {
+            "start": 2802,
+            "end": 2830
+          },
+          "section": "Dependency Tracking System",
+          "startLine": 110,
+          "endLine": 110
+        }
+      ],
+      "contentHash": "p3t001hash"
+    },
+    {
+      "id": "P3.T002",
+      "feature_id": "F009",
+      "title": "Build dependency tracker",
+      "description": "Implement graph algorithms for dependency tracking",
+      "category": "implementation",
+      "skillsRequired": ["algorithms", "graphs"],
+      "duration": {
+        "optimistic": 4,
+        "mostLikely": 6,
+        "pessimistic": 8
+      },
+      "durationUnits": "hours",
+      "interfaces_produced": ["DependencyTracker:v1"],
+      "interfaces_consumed": ["DependencySchema:v1"],
+      "acceptance_checks": [
+        {
+          "type": "command",
+          "cmd": "npm test -- dependency",
+          "expect": {
+            "passRateGte": 0.95
+          }
+        }
+      ],
+      "source_evidence": [
+        {
+          "quote": "Build dependency graph",
+          "loc": {
+            "start": 2835,
+            "end": 2858
+          },
+          "section": "Dependency Tracking System",
+          "startLine": 111,
+          "endLine": 111
+        }
+      ],
+      "contentHash": "p3t002hash"
+    },
+    {
+      "id": "P3.T003",
+      "feature_id": "F010",
+      "title": "Implement freshness scorer",
+      "description": "Calculate freshness scores based on age and modifications",
+      "category": "implementation",
+      "skillsRequired": ["algorithms", "javascript"],
+      "duration": {
+        "optimistic": 3,
+        "mostLikely": 4,
+        "pessimistic": 6
+      },
+      "durationUnits": "hours",
+      "interfaces_produced": ["FreshnessScorer:v1"],
+      "interfaces_consumed": [],
+      "acceptance_checks": [
+        {
+          "type": "metric",
+          "name": "freshness_accuracy",
+          "expect": {
+            "lte": 0.9
+          }
+        }
+      ],
+      "source_evidence": [
+        {
+          "quote": "Calculate age-based scores",
+          "loc": {
+            "start": 2975,
+            "end": 3002
+          },
+          "section": "Freshness Scoring Algorithm",
+          "startLine": 117,
+          "endLine": 117
+        }
+      ],
+      "contentHash": "p3t003hash"
+    },
+    {
+      "id": "P3.T004",
+      "feature_id": "F011",
+      "title": "Create invalidation rules",
+      "description": "Define rule system for automatic invalidation",
+      "category": "implementation",
+      "skillsRequired": ["rules-engine", "javascript"],
+      "duration": {
+        "optimistic": 3,
+        "mostLikely": 5,
+        "pessimistic": 7
+      },
+      "durationUnits": "hours",
+      "interfaces_produced": ["InvalidationRules:v1"],
+      "interfaces_consumed": ["FreshnessScorer:v1", "DependencyTracker:v1"],
+      "acceptance_checks": [
+        {
+          "type": "command",
+          "cmd": "npm test -- invalidation",
+          "expect": {
+            "passRateGte": 0.95
+          }
+        }
+      ],
+      "source_evidence": [
+        {
+          "quote": "Define invalidation triggers",
+          "loc": {
+            "start": 3145,
+            "end": 3174
+          },
+          "section": "Invalidation Rules Engine",
+          "startLine": 124,
+          "endLine": 124
+        }
+      ],
+      "contentHash": "p3t004hash"
+    },
+    {
+      "id": "P3.T005",
+      "feature_id": "F012",
+      "title": "Build semantic extractor",
+      "description": "Extract semantic information from command outputs",
+      "category": "implementation",
+      "skillsRequired": ["nlp", "parsing"],
+      "duration": {
+        "optimistic": 3,
+        "mostLikely": 5,
+        "pessimistic": 8
+      },
+      "durationUnits": "hours",
+      "interfaces_produced": ["SemanticExtractor:v1"],
+      "interfaces_consumed": [],
+      "acceptance_checks": [
+        {
+          "type": "command",
+          "cmd": "npm test -- semantic",
+          "expect": {
+            "passRateGte": 0.90
+          }
+        }
+      ],
+      "source_evidence": [
+        {
+          "quote": "Extract key information",
+          "loc": {
+            "start": 3305,
+            "end": 3330
+          },
+          "section": "Semantic Enhancement",
+          "startLine": 131,
+          "endLine": 131
+        }
+      ],
+      "contentHash": "p3t005hash"
+    },
+    {
+      "id": "P3.T006",
+      "feature_id": "F012",
+      "title": "Create search index",
+      "description": "Build searchable index of semantic information",
+      "category": "implementation",
+      "skillsRequired": ["indexing", "search"],
+      "duration": {
+        "optimistic": 2,
+        "mostLikely": 4,
+        "pessimistic": 6
+      },
+      "durationUnits": "hours",
+      "interfaces_produced": ["SearchIndex:v1"],
+      "interfaces_consumed": ["SemanticExtractor:v1"],
+      "acceptance_checks": [
+        {
+          "type": "metric",
+          "name": "search_latency_ms",
+          "expect": {
+            "lte": 50
+          }
+        }
+      ],
+      "source_evidence": [
+        {
+          "quote": "Create searchable index",
+          "loc": {
+            "start": 3362,
+            "end": 3387
+          },
+          "section": "Semantic Enhancement",
+          "startLine": 133,
+          "endLine": 133
+        }
+      ],
+      "contentHash": "p3t006hash"
+    }
+  ],
+  "dependencies": [
+    {
+      "from": "P1.T002",
+      "to": "P1.T003",
+      "type": "technical",
+      "reason": "Registry manager requires schema definition",
+      "evidence": [
+        {
+          "type": "doc",
+          "reason": "RegistryManager:v1 consumes RegistrySchema:v1",
+          "confidence": 0.95
+        }
+      ],
+      "confidence": 0.95,
+      "isHard": true
+    },
+    {
+      "from": "P1.T001",
+      "to": "P1.T007",
+      "type": "technical",
+      "reason": "Hook handler requires parser",
+      "evidence": [
+        {
+          "type": "doc",
+          "reason": "PostToolUseHandler:v1 consumes PathParser:v1",
+          "confidence": 0.95
+        }
+      ],
+      "confidence": 0.95,
+      "isHard": true
+    },
+    {
+      "from": "P1.T003",
+      "to": "P1.T007",
+      "type": "technical",
+      "reason": "Hook handler requires registry manager",
+      "evidence": [
+        {
+          "type": "doc",
+          "reason": "PostToolUseHandler:v1 consumes RegistryManager:v1",
+          "confidence": 0.95
+        }
+      ],
+      "confidence": 0.95,
+      "isHard": true
+    },
+    {
+      "from": "P1.T004",
+      "to": "P1.T007",
+      "type": "technical",
+      "reason": "Hook handler requires environment exporter",
+      "evidence": [
+        {
+          "type": "doc",
+          "reason": "PostToolUseHandler:v1 consumes EnvExporter:v1",
+          "confidence": 0.95
+        }
+      ],
+      "confidence": 0.95,
+      "isHard": true
+    },
+    {
+      "from": "P1.T005",
+      "to": "P1.T006",
+      "type": "sequential",
+      "reason": "Context generator needs format specification",
+      "evidence": [
+        {
+          "type": "doc",
+          "reason": "ContextGenerator:v1 consumes BasicContextFormat:v1",
+          "confidence": 0.9
+        }
+      ],
+      "confidence": 0.9,
+      "isHard": true
+    },
+    {
+      "from": "P1.T006",
+      "to": "P1.T007",
+      "type": "technical",
+      "reason": "Hook handler requires context generator",
+      "evidence": [
+        {
+          "type": "doc",
+          "reason": "PostToolUseHandler:v1 consumes ContextGenerator:v1",
+          "confidence": 0.95
+        }
+      ],
+      "confidence": 0.95,
+      "isHard": true
+    },
+    {
+      "from": "P1.T007",
+      "to": "P2.T005",
+      "type": "sequential",
+      "reason": "Cross-platform testing requires completed Phase 1 handler",
+      "evidence": [
+        {
+          "type": "doc",
+          "reason": "Testing validates PostToolUseHandler:v1",
+          "confidence": 0.9
+        }
+      ],
+      "confidence": 0.9,
+      "isHard": true
+    },
+    {
+      "from": "P1.T003",
+      "to": "P2.T002",
+      "type": "technical",
+      "reason": "File locking enhances registry manager",
+      "evidence": [
+        {
+          "type": "doc",
+          "reason": "FileLocking:v1 enhances RegistryManager:v1",
+          "confidence": 0.85
+        }
+      ],
+      "confidence": 0.85,
+      "isHard": false
+    },
+    {
+      "from": "P1.T003",
+      "to": "P2.T003",
+      "type": "technical",
+      "reason": "Compression enhances registry manager",
+      "evidence": [
+        {
+          "type": "doc",
+          "reason": "Compression:v1 enhances RegistryManager:v1",
+          "confidence": 0.8
+        }
+      ],
+      "confidence": 0.8,
+      "isHard": false
+    },
+    {
+      "from": "P1.T005",
+      "to": "P2.T004",
+      "type": "sequential",
+      "reason": "Enhanced formatting builds on basic format",
+      "evidence": [
+        {
+          "type": "doc",
+          "reason": "EnhancedFormat:v1 extends BasicContextFormat:v1",
+          "confidence": 0.75
+        }
+      ],
+      "confidence": 0.75,
+      "isHard": false
+    },
+    {
+      "from": "P3.T001",
+      "to": "P3.T002",
+      "type": "sequential",
+      "reason": "Dependency tracker requires schema",
+      "evidence": [
+        {
+          "type": "doc",
+          "reason": "DependencyTracker:v1 consumes DependencySchema:v1",
+          "confidence": 0.95
+        }
+      ],
+      "confidence": 0.95,
+      "isHard": true
+    },
+    {
+      "from": "P3.T002",
+      "to": "P3.T004",
+      "type": "technical",
+      "reason": "Invalidation rules use dependency tracking",
+      "evidence": [
+        {
+          "type": "doc",
+          "reason": "InvalidationRules:v1 consumes DependencyTracker:v1",
+          "confidence": 0.9
+        }
+      ],
+      "confidence": 0.9,
+      "isHard": true
+    },
+    {
+      "from": "P3.T003",
+      "to": "P3.T004",
+      "type": "technical",
+      "reason": "Invalidation rules use freshness scores",
+      "evidence": [
+        {
+          "type": "doc",
+          "reason": "InvalidationRules:v1 consumes FreshnessScorer:v1",
+          "confidence": 0.9
+        }
+      ],
+      "confidence": 0.9,
+      "isHard": true
+    },
+    {
+      "from": "P3.T005",
+      "to": "P3.T006",
+      "type": "sequential",
+      "reason": "Search index requires semantic extraction",
+      "evidence": [
+        {
+          "type": "doc",
+          "reason": "SearchIndex:v1 consumes SemanticExtractor:v1",
+          "confidence": 0.9
+        }
+      ],
+      "confidence": 0.9,
+      "isHard": true
+    },
+    {
+      "from": "P2.T001",
+      "to": "P1.T001",
+      "type": "knowledge",
+      "reason": "Markers inform parser design but not required",
+      "evidence": [
+        {
+          "type": "doc",
+          "reason": "Enhanced parsing with markers",
+          "confidence": 0.6
+        }
+      ],
+      "confidence": 0.6,
+      "isHard": false
+    }
+  ]
+}
