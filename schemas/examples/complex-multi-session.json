@@ -1,0 +1,384 @@
+{
+  "name": "Complex Multi-Session Dependencies",
+  "description": "Demonstrates complex relationships across multiple development sessions with various dependency types",
+  "schemaVersion": "1.0.0",
+  "metadata": {
+    "createdAt": "2025-01-13T14:00:00Z",
+    "updatedAt": "2025-01-13T16:45:00Z",
+    "version": 5
+  },
+  "commands": {
+    "cmd-db-migrate-1234-1234-1234-123456789012": {
+      "id": "cmd-db-migrate-1234-1234-1234-123456789012",
+      "parentId": null,
+      "sessionId": "db-session-1",
+      "timestamp": "2025-01-13T14:00:00Z",
+      "metadata": {
+        "tool": "Bash",
+        "command": "npm run db:migrate",
+        "workingDirectory": "/project",
+        "exitCode": 0,
+        "duration": 5000,
+        "captureSize": 2048
+      },
+      "files": [
+        {
+          "path": "migrations/",
+          "type": "input"
+        },
+        {
+          "path": "db/schema.sql",
+          "hash": "12345678901234567890123456789012345678901234567890123456789012345",
+          "size": 4096,
+          "mtime": "2025-01-13T14:00:05Z",
+          "type": "output"
+        }
+      ],
+      "capturePath": "/tmp/db-migrate-output-12357.log",
+      "status": "completed",
+      "freshnessScore": 0.95
+    },
+    "cmd-seed-data-12-1234-1234-1234-123456789012": {
+      "id": "cmd-seed-data-12-1234-1234-1234-123456789012",
+      "parentId": "cmd-db-migrate-1234-1234-1234-123456789012",
+      "sessionId": "db-session-1",
+      "timestamp": "2025-01-13T14:05:00Z",
+      "metadata": {
+        "tool": "Bash",
+        "command": "npm run db:seed",
+        "workingDirectory": "/project",
+        "exitCode": 0,
+        "duration": 3000,
+        "captureSize": 1024
+      },
+      "files": [
+        {
+          "path": "seeds/",
+          "type": "input"
+        },
+        {
+          "path": "db/schema.sql",
+          "hash": "12345678901234567890123456789012345678901234567890123456789012345",
+          "type": "dependency"
+        }
+      ],
+      "capturePath": "/tmp/db-seed-output-12358.log",
+      "status": "completed",
+      "freshnessScore": 0.92
+    },
+    "cmd-api-test-123-1234-1234-1234-123456789012": {
+      "id": "cmd-api-test-123-1234-1234-1234-123456789012",
+      "parentId": null,
+      "sessionId": "api-session-1",
+      "timestamp": "2025-01-13T14:30:00Z",
+      "metadata": {
+        "tool": "Bash",
+        "command": "npm run test:api",
+        "workingDirectory": "/project",
+        "exitCode": 0,
+        "duration": 12000,
+        "captureSize": 8192
+      },
+      "files": [
+        {
+          "path": "test/api/",
+          "type": "input"
+        },
+        {
+          "path": "db/schema.sql",
+          "hash": "12345678901234567890123456789012345678901234567890123456789012345",
+          "type": "dependency"
+        }
+      ],
+      "capturePath": "/tmp/api-test-output-12359.log",
+      "status": "completed",
+      "freshnessScore": 0.88,
+      "invalidationRules": [
+        {
+          "id": "api-test-db-dependency",
+          "trigger": "dependency_changed",
+          "condition": {
+            "commands": ["cmd-db-migrate-1234-1234-1234-123456789012", "cmd-seed-data-12-1234-1234-1234-123456789012"]
+          },
+          "action": "recompute"
+        }
+      ]
+    },
+    "cmd-docker-build-1234-1234-1234-123456789012": {
+      "id": "cmd-docker-build-1234-1234-1234-123456789012",
+      "parentId": null,
+      "sessionId": "deploy-session-1",
+      "timestamp": "2025-01-13T15:00:00Z",
+      "metadata": {
+        "tool": "Bash",
+        "command": "docker build -t myapp:latest .",
+        "workingDirectory": "/project",
+        "exitCode": 0,
+        "duration": 45000,
+        "captureSize": 16384
+      },
+      "files": [
+        {
+          "path": "Dockerfile",
+          "type": "input"
+        },
+        {
+          "path": "package.json",
+          "type": "input"
+        },
+        {
+          "path": "src/",
+          "type": "input"
+        }
+      ],
+      "capturePath": "/tmp/docker-build-output-12360.log",
+      "status": "completed",
+      "freshnessScore": 0.85,
+      "invalidationRules": [
+        {
+          "id": "dockerfile-changes",
+          "trigger": "file_modified",
+          "condition": {
+            "files": ["Dockerfile", "package.json", "src/"]
+          },
+          "action": "invalidate"
+        }
+      ]
+    },
+    "cmd-integration-deploy-1234-1234-123456789012": {
+      "id": "cmd-integration-deploy-1234-1234-123456789012",
+      "parentId": "cmd-docker-build-1234-1234-1234-123456789012",
+      "sessionId": "deploy-session-1",
+      "timestamp": "2025-01-13T15:45:00Z",
+      "metadata": {
+        "tool": "Bash",
+        "command": "docker-compose up -d integration",
+        "workingDirectory": "/project",
+        "exitCode": 0,
+        "duration": 15000,
+        "captureSize": 4096
+      },
+      "files": [
+        {
+          "path": "docker-compose.yml",
+          "type": "input"
+        },
+        {
+          "path": "db/schema.sql",
+          "hash": "12345678901234567890123456789012345678901234567890123456789012345",
+          "type": "dependency"
+        }
+      ],
+      "capturePath": "/tmp/integration-deploy-output-12361.log",
+      "status": "completed",
+      "freshnessScore": 0.82
+    },
+    "cmd-smoke-test-12-1234-1234-1234-123456789012": {
+      "id": "cmd-smoke-test-12-1234-1234-1234-123456789012",
+      "parentId": "cmd-integration-deploy-1234-1234-123456789012",
+      "sessionId": "deploy-session-1",
+      "timestamp": "2025-01-13T16:00:00Z",
+      "metadata": {
+        "tool": "Bash",
+        "command": "npm run test:smoke",
+        "workingDirectory": "/project",
+        "exitCode": 0,
+        "duration": 8000,
+        "captureSize": 2048
+      },
+      "files": [
+        {
+          "path": "test/smoke/",
+          "type": "input"
+        }
+      ],
+      "capturePath": "/tmp/smoke-test-output-12362.log",
+      "status": "completed",
+      "freshnessScore": 0.95
+    },
+    "cmd-performance-test-1234-1234-123456789012": {
+      "id": "cmd-performance-test-1234-1234-123456789012",
+      "parentId": null,
+      "sessionId": "perf-session-1",
+      "timestamp": "2025-01-13T16:30:00Z",
+      "metadata": {
+        "tool": "Bash",
+        "command": "npm run test:performance",
+        "workingDirectory": "/project",
+        "exitCode": 0,
+        "duration": 30000,
+        "captureSize": 32768
+      },
+      "files": [
+        {
+          "path": "test/performance/",
+          "type": "input"
+        },
+        {
+          "path": "reports/performance.html",
+          "type": "output"
+        }
+      ],
+      "capturePath": "/tmp/performance-test-output-12363.log",
+      "status": "completed",
+      "freshnessScore": 0.98,
+      "invalidationRules": [
+        {
+          "id": "performance-environment-dependency",
+          "trigger": "dependency_changed",
+          "condition": {
+            "commands": ["cmd-integration-deploy-1234-1234-123456789012"]
+          },
+          "action": "recompute"
+        }
+      ]
+    }
+  },
+  "dependencies": [
+    {
+      "from": "cmd-db-migrate-1234-1234-1234-123456789012",
+      "to": "cmd-seed-data-12-1234-1234-1234-123456789012",
+      "type": "sequential",
+      "strength": 1.0,
+      "metadata": {
+        "reason": "Database seeding requires schema migration",
+        "files": ["db/schema.sql"],
+        "conditional": false
+      }
+    },
+    {
+      "from": "cmd-db-migrate-1234-1234-1234-123456789012",
+      "to": "cmd-api-test-123-1234-1234-1234-123456789012",
+      "type": "input_output",
+      "strength": 0.8,
+      "metadata": {
+        "reason": "API tests depend on database schema",
+        "files": ["db/schema.sql"],
+        "conditional": false
+      }
+    },
+    {
+      "from": "cmd-seed-data-12-1234-1234-1234-123456789012",
+      "to": "cmd-api-test-123-1234-1234-1234-123456789012",
+      "type": "input_output",
+      "strength": 0.6,
+      "metadata": {
+        "reason": "API tests may use seeded data",
+        "files": [],
+        "conditional": true
+      }
+    },
+    {
+      "from": "cmd-docker-build-1234-1234-1234-123456789012",
+      "to": "cmd-integration-deploy-1234-1234-123456789012",
+      "type": "sequential",
+      "strength": 1.0,
+      "metadata": {
+        "reason": "Deployment requires built Docker image",
+        "files": [],
+        "conditional": false
+      }
+    },
+    {
+      "from": "cmd-integration-deploy-1234-1234-123456789012",
+      "to": "cmd-smoke-test-12-1234-1234-1234-123456789012",
+      "type": "sequential",
+      "strength": 1.0,
+      "metadata": {
+        "reason": "Smoke tests require deployed environment",
+        "files": [],
+        "conditional": false
+      }
+    },
+    {
+      "from": "cmd-integration-deploy-1234-1234-123456789012",
+      "to": "cmd-performance-test-1234-1234-123456789012",
+      "type": "conditional",
+      "strength": 0.7,
+      "metadata": {
+        "reason": "Performance tests require stable deployment",
+        "files": [],
+        "conditional": true
+      }
+    },
+    {
+      "from": "cmd-db-migrate-1234-1234-1234-123456789012",
+      "to": "cmd-integration-deploy-1234-1234-123456789012",
+      "type": "input_output",
+      "strength": 0.5,
+      "metadata": {
+        "reason": "Integration deployment may need database schema",
+        "files": ["db/schema.sql"],
+        "conditional": true
+      }
+    }
+  ],
+  "globalInvalidationRules": [
+    {
+      "id": "database-schema-cascade",
+      "trigger": "file_modified",
+      "condition": {
+        "files": ["db/schema.sql", "migrations/"]
+      },
+      "action": "cascade"
+    },
+    {
+      "id": "deployment-environment-change",
+      "trigger": "command_failed",
+      "condition": {
+        "commands": ["cmd-integration-deploy-1234-1234-123456789012"]
+      },
+      "action": "invalidate"
+    },
+    {
+      "id": "performance-test-staleness",
+      "trigger": "time_elapsed",
+      "condition": {
+        "maxAge": 7200
+      },
+      "action": "recompute"
+    }
+  ],
+  "indices": {
+    "byParent": {
+      "null": [
+        "cmd-db-migrate-1234-1234-1234-123456789012",
+        "cmd-api-test-123-1234-1234-1234-123456789012",
+        "cmd-docker-build-1234-1234-1234-123456789012",
+        "cmd-performance-test-1234-1234-123456789012"
+      ],
+      "cmd-db-migrate-1234-1234-1234-123456789012": ["cmd-seed-data-12-1234-1234-1234-123456789012"],
+      "cmd-docker-build-1234-1234-1234-123456789012": ["cmd-integration-deploy-1234-1234-123456789012"],
+      "cmd-integration-deploy-1234-1234-123456789012": ["cmd-smoke-test-12-1234-1234-1234-123456789012"]
+    },
+    "byFile": {
+      "db/schema.sql": [
+        "cmd-db-migrate-1234-1234-1234-123456789012",
+        "cmd-seed-data-12-1234-1234-1234-123456789012",
+        "cmd-api-test-123-1234-1234-1234-123456789012",
+        "cmd-integration-deploy-1234-1234-123456789012"
+      ],
+      "Dockerfile": ["cmd-docker-build-1234-1234-1234-123456789012"],
+      "package.json": ["cmd-docker-build-1234-1234-1234-123456789012"]
+    },
+    "bySession": {
+      "db-session-1": ["cmd-db-migrate-1234-1234-1234-123456789012", "cmd-seed-data-12-1234-1234-1234-123456789012"],
+      "api-session-1": ["cmd-api-test-123-1234-1234-1234-123456789012"],
+      "deploy-session-1": [
+        "cmd-docker-build-1234-1234-1234-123456789012",
+        "cmd-integration-deploy-1234-1234-123456789012",
+        "cmd-smoke-test-12-1234-1234-1234-123456789012"
+      ],
+      "perf-session-1": ["cmd-performance-test-1234-1234-123456789012"]
+    },
+    "topological": [
+      "cmd-db-migrate-1234-1234-1234-123456789012",
+      "cmd-seed-data-12-1234-1234-1234-123456789012",
+      "cmd-api-test-123-1234-1234-1234-123456789012",
+      "cmd-docker-build-1234-1234-1234-123456789012",
+      "cmd-integration-deploy-1234-1234-123456789012",
+      "cmd-smoke-test-12-1234-1234-1234-123456789012",
+      "cmd-performance-test-1234-1234-123456789012"
+    ]
+  }
+}
