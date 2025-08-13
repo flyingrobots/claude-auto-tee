@@ -18,7 +18,15 @@
     "test:cross-platform": "bash -c 'echo Testing on $(uname -s 2>/dev/null || echo Windows); bash test/graceful-degradation-test.sh && node test/test.js && bash test/error-codes-test.sh && bash test/resource-management-test.sh && bash test/integration-test.sh && bash test/test-path-handling.sh && bash test/test-resource-warnings.sh && bash test/test-platform-specific.sh'",
     "test:path-handling": "bash test/test-path-handling.sh",
     "test:resource-warnings": "bash test/test-resource-warnings.sh",
-    "test:platform-specific": "bash test/test-platform-specific.sh"
+    "test:platform-specific": "bash test/test-platform-specific.sh",
+    "test:unicode": "node test/unicode/unicode-paths.test.js",
+    "test:semantic": "node test/semantic/semantic-extractor.test.js",
+    "test:parser": "node test/parser/capture-path-parser.test.js",
+    "test:schema": "node schemas/validate-schema.js",
+    "test:env": "node test/env/environment-exporter.test.js",
+    "test:env-acceptance": "bash test/env/acceptance-test.sh",
+    "test:env-demo": "node test/env/demo.js",
+    "test:freshness": "node test/scoring/run-freshness-tests.js"
   },
   "repository": {
     "type": "git",
@@ -39,6 +47,8 @@
   "homepage": "https://github.com/flyingrobots/claude-auto-tee#readme",
   "devDependencies": {
     "@next/eslint-plugin-next": "^15.4.6",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
     "eslint-config-next": "^15.4.6"
   },
   "dependencies": {
