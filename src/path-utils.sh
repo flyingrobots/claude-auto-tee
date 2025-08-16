@@ -171,11 +171,22 @@ create_safe_temp_path() {
         return 1
     fi
     
-    # Generate unique filename component
+    # Generate unique filename component - POSIX compliant
+    # Use epoch seconds + fast random suffix for uniqueness
     local timestamp
-    timestamp=$(date +%s%N | cut -b1-13)
-    local random_component="$RANDOM"
-    local filename="${prefix}-${timestamp}-${random_component}${suffix}"
+    timestamp=$(date +%s)
+    
+    # Get 4 random hex characters for uniqueness (extremely fast from /dev/urandom)
+    local random_suffix
+    if [ -r /dev/urandom ]; then
+        # Read 2 bytes = 4 hex chars (very fast, no external commands needed)
+        random_suffix=$(od -An -N2 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
+    else
+        # Fallback: use PID + whatever randomness we have
+        random_suffix="$$${RANDOM:-0}"
+    fi
+    
+    local filename="${prefix}-${timestamp}-${random_suffix}${suffix}"
     
     # Join and return the complete path
     join_path "$temp_dir" "$filename"

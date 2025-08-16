@@ -20,6 +20,16 @@ readonly TEMP_FILE_PREFIX="${CLAUDE_AUTO_TEE_TEMP_PREFIX:-claude}"
 readonly DEFAULT_MAX_TEMP_FILE_SIZE=104857600
 readonly MAX_TEMP_FILE_SIZE="${CLAUDE_AUTO_TEE_MAX_SIZE:-$DEFAULT_MAX_TEMP_FILE_SIZE}"
 
+# Dry-run mode
+readonly DRY_RUN_MODE="${CLAUDE_AUTO_TEE_DRY_RUN:-false}"
+
+# Multi-pipe support (opt-in)
+readonly ALLOW_MULTI_PIPE="${CLAUDE_AUTO_TEE_ALLOW_MULTI:-false}"
+
+# Deny/allow lists (comma-separated)
+readonly DENYLIST="${CLAUDE_AUTO_TEE_DENYLIST:-}"
+readonly ALLOWLIST="${CLAUDE_AUTO_TEE_ALLOWLIST:-}"
+
 # Age-based cleanup configuration (P1.T015)
 readonly CLEANUP_AGE_HOURS="${CLAUDE_AUTO_TEE_CLEANUP_AGE_HOURS:-48}"   # Default: 48 hours
 readonly ENABLE_AGE_CLEANUP="${CLAUDE_AUTO_TEE_ENABLE_AGE_CLEANUP:-true}"
@@ -730,23 +740,44 @@ if [[ -z "$input" ]]; then
     report_error $ERR_INVALID_INPUT "Empty input received" true
 fi
 
-# Extract command from JSON (handle escaped quotes)
+# Extract command from JSON (hardened with jq fallback)
 set_error_context "Parsing JSON input"
-command_escaped=$(echo "$input" | sed -n 's/.*"command":"\([^"]*\(\\"[^"]*\)*\)".*/\1/p' | tr -d '\n')
-if [[ -z "$command_escaped" ]]; then
-    log_verbose "No command found in JSON, checking for malformed JSON"
-    if ! echo "$input" | grep -q '"tool"'; then
-        log_verbose "Input does not appear to be valid tool JSON - passing through unchanged"
-        report_warning $ERR_MALFORMED_JSON "Malformed JSON input - graceful passthrough"
+
+# Try jq first for robust JSON parsing
+if command -v jq >/dev/null 2>&1; then
+    command=$(echo "$input" | jq -r '.tool.input.command // empty' 2>/dev/null)
+    if [[ -n "$command" ]]; then
+        log_verbose "Command extracted using jq: $command"
+    else
+        # jq didn't find command, check if it's valid JSON
+        if ! echo "$input" | jq . >/dev/null 2>&1; then
+            log_verbose "Input is not valid JSON - passing through unchanged"
+            report_warning $ERR_MALFORMED_JSON "Malformed JSON input - graceful passthrough"
+            echo "$input"
+            exit 0
+        fi
+        # Valid JSON but no bash command
         echo "$input"
         exit 0
     fi
-    # Not a bash command, pass through unchanged
-    echo "$input"
-    exit 0
+else
+    # Fallback to sed parsing (existing logic)
+    log_verbose "jq not available, using sed fallback for JSON parsing"
+    command_escaped=$(echo "$input" | sed -n 's/.*"command":"\([^"]*\(\\"[^"]*\)*\)".*/\1/p' | tr -d '\n')
+    if [[ -z "$command_escaped" ]]; then
+        log_verbose "No command found in JSON, checking for malformed JSON"
+        if ! echo "$input" | grep -q '"tool"'; then
+            log_verbose "Input does not appear to be valid tool JSON - passing through unchanged"
+            report_warning $ERR_MALFORMED_JSON "Malformed JSON input - graceful passthrough"
+            echo "$input"
+            exit 0
+        fi
+        # Not a bash command, pass through unchanged
+        echo "$input"
+        exit 0
+    fi
+    command=$(echo "$command_escaped" | sed 's/\\"/"/g')
 fi
-
-command=$(echo "$command_escaped" | sed 's/\\"/"/g')
 if [[ -z "$command" ]]; then
     report_error $ERR_MISSING_COMMAND "Command field is empty" true
 fi
@@ -893,10 +924,70 @@ detect_first_pipe_position() {
     return 0
 }
 
+# Check deny/allow lists
+check_deny_allow_lists() {
+    local cmd="$1"
+    
+    # Extract first command for deny/allow checking
+    local first_cmd
+    first_cmd=$(echo "$cmd" | awk '{print $1}')
+    
+    # Check denylist
+    if [[ -n "$DENYLIST" ]]; then
+        IFS=',' read -ra DENY_ARRAY <<< "$DENYLIST"
+        for denied in "${DENY_ARRAY[@]}"; do
+            denied=$(echo "$denied" | tr -d ' ')
+            if [[ "$first_cmd" == "$denied" ]]; then
+                echo "[#auto-tee] pass-through: command in denylist" >&2
+                log_verbose "Command '$first_cmd' is in denylist - passing through unchanged"
+                return 1
+            fi
+        done
+    fi
+    
+    # Check allowlist (if specified, only allow listed commands)
+    if [[ -n "$ALLOWLIST" ]]; then
+        IFS=',' read -ra ALLOW_ARRAY <<< "$ALLOWLIST"
+        local allowed=false
+        for allow in "${ALLOW_ARRAY[@]}"; do
+            allow=$(echo "$allow" | tr -d ' ')
+            if [[ "$first_cmd" == "$allow" ]]; then
+                allowed=true
+                break
+            fi
+        done
+        if [[ "$allowed" == "false" ]]; then
+            echo "[#auto-tee] pass-through: command not in allowlist" >&2
+            log_verbose "Command '$first_cmd' is not in allowlist - passing through unchanged"
+            return 1
+        fi
+    fi
+    
+    return 0
+}
+
+# Dry-run mode check
+if [[ "$DRY_RUN_MODE" == "true" ]]; then
+    echo "[#auto-tee] DRY-RUN MODE" >&2
+    echo "[#auto-tee] Would process command: $command" >&2
+    temp_dir=$(get_temp_dir 2>/dev/null || echo "/tmp")
+    echo "[#auto-tee] Would use temp dir: $temp_dir" >&2
+    echo "[#auto-tee] Would create temp file: ${temp_dir}/${TEMP_FILE_PREFIX}-$(date +%s).log" >&2
+    echo "$input"
+    exit 0
+fi
+
 # Check if command contains pipe and doesn't already have tee
 log_verbose "Validating command security: $command"
 if ! validate_command_security "$command"; then
+    echo "[#auto-tee] pass-through: security check failed" >&2
     log_verbose "Command failed security validation - passing through unchanged"
+    echo "$input"
+    exit 0
+fi
+
+# Check deny/allow lists
+if ! check_deny_allow_lists "$command"; then
     echo "$input"
     exit 0
 fi
@@ -910,11 +1001,20 @@ if [[ "$pipe_count" -gt 0 ]]; then
         exit 0
     fi
     
-    # Additional check: only handle simple single-pipe commands for security
+    # Additional check: handle multi-pipe if explicitly allowed
     if [[ "$pipe_count" -ne 1 ]]; then
-        log_verbose "Multiple pipes detected ($pipe_count) - passing through unchanged for security"
-        echo "$input"
-        exit 0
+        if [[ "$ALLOW_MULTI_PIPE" != "true" ]]; then
+            log_verbose "Multiple pipes detected ($pipe_count) - passing through unchanged (set CLAUDE_AUTO_TEE_ALLOW_MULTI=true to enable)"
+            echo "$input"
+            exit 0
+        else
+            log_verbose "Multiple pipes detected ($pipe_count) - processing with multi-pipe support"
+            # Note: Multi-pipe implementation would go here in future
+            # For now, still pass through as it's not fully implemented
+            log_verbose "Multi-pipe support not yet fully implemented - passing through"
+            echo "$input"
+            exit 0
+        fi
     fi
     
     # Process - has single pipe but no tee
@@ -995,7 +1095,17 @@ if [[ "$pipe_count" -gt 0 ]]; then
     # Use path utilities for robust cross-platform path handling
     if ! temp_file=$(create_safe_temp_path "$temp_dir" "$TEMP_FILE_PREFIX" ".log"); then
         log_verbose "Failed to create safe temp path, falling back to basic method"
-        temp_file="${temp_dir}/${TEMP_FILE_PREFIX}-$(date +%s%N | cut -b1-13).log"
+        # Fallback: POSIX timestamp + hash
+        timestamp=$(date +%s)
+        unique_string="${timestamp}-$$-${RANDOM:-0}"
+        if command -v md5sum >/dev/null 2>&1; then
+            hash_suffix=$(echo "$unique_string" | md5sum | cut -c1-6)
+        elif command -v md5 >/dev/null 2>&1; then
+            hash_suffix=$(echo "$unique_string" | md5 | cut -c1-6)
+        else
+            hash_suffix="$$$(date +%S)"
+        fi
+        temp_file="${temp_dir}/${TEMP_FILE_PREFIX}-${timestamp}${hash_suffix}.log"
         temp_file=$(normalize_path "$temp_file")
     fi
     
@@ -1058,7 +1168,7 @@ if [[ "$pipe_count" -gt 0 ]]; then
     fi
     
     # Add size warning when pipeline truncation occurs (temp file may still contain full output)
-    modified_command="{ $base_tee_command; PIPELINE_SIZE=\$?; TEMP_SIZE=\$(wc -c < \"$temp_file\" 2>/dev/null || echo 0); if [[ \$TEMP_SIZE -gt $MAX_TEMP_FILE_SIZE ]]; then echo \"[CLAUDE-AUTO-TEE] INFO: Full output (\$TEMP_SIZE bytes) saved to temp file, pipeline limited to $((MAX_TEMP_FILE_SIZE / 1024 / 1024))MB\" >&2; fi; } | $after_pipe"
+    modified_command="{ $base_tee_command; PIPELINE_SIZE=\$?; TEMP_SIZE=\$(wc -c < \"$temp_file\" 2>/dev/null || echo 0); if [[ \$TEMP_SIZE -gt $MAX_TEMP_FILE_SIZE ]]; then echo \"[#auto-tee] truncated:yes full_size:\$(( \$TEMP_SIZE / 1048576 ))MB limit:$((MAX_TEMP_FILE_SIZE / 1048576))MB\" >&2; fi; } | $after_pipe"
     log_verbose "Pipeline receives size-limited data, temp file contains full output: $modified_command"
     
     # Add cleanup on successful completion (P1.T013)
@@ -1066,11 +1176,11 @@ if [[ "$pipe_count" -gt 0 ]]; then
     final_command="$modified_command"
     
     if [[ "$CLEANUP_ON_SUCCESS" == "true" ]] && [[ -n "$cleanup_script" ]] && [[ -f "$cleanup_script" ]]; then
-        cleanup_command="source \"$cleanup_script\" && { $final_command; } && { echo \"Full output saved to: $temp_file\"; source \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" && inject_capture_end_marker \"$temp_file\" 2>/dev/null || true; cleanup_temp_file \"$temp_file\"; rm -f \"$cleanup_script\" 2>/dev/null || true; } || { echo \"Command failed - temp file preserved: $temp_file\"; source \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" && inject_capture_end_marker \"$temp_file\" 2>/dev/null || true; rm -f \"$cleanup_script\" 2>/dev/null || true; }"
+        cleanup_command="source \"$cleanup_script\" && { $final_command; } && { TEMP_SIZE=\$(wc -c < \"$temp_file\" 2>/dev/null || echo 0); echo \"[#auto-tee] saved:$temp_file size:\$(( \$TEMP_SIZE / 1048576 ))MB cleanup:on\" >&2; if [[ -f \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" ]]; then source \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" && inject_capture_end_marker \"$temp_file\" 2>/dev/null || true; fi; cleanup_temp_file \"$temp_file\"; rm -f \"$cleanup_script\" 2>/dev/null || true; } || { echo \"[#auto-tee] failed:$temp_file preserved:yes\" >&2; if [[ -f \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" ]]; then source \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" && inject_capture_end_marker \"$temp_file\" 2>/dev/null || true; fi; rm -f \"$cleanup_script\" 2>/dev/null || true; }"
         log_verbose "Added cleanup logic with end markers for successful completion (CLEANUP_ON_SUCCESS=$CLEANUP_ON_SUCCESS)"
     else
         # No cleanup or cleanup disabled - preserve temp file
-        cleanup_command="{ $final_command; } && { echo \"Full output saved to: $temp_file\"; source \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" && inject_capture_end_marker \"$temp_file\" 2>/dev/null || true; } || { echo \"Command failed - temp file preserved: $temp_file\"; source \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" && inject_capture_end_marker \"$temp_file\" 2>/dev/null || true; }"
+        cleanup_command="{ $final_command; } && { TEMP_SIZE=\$(wc -c < \"$temp_file\" 2>/dev/null || echo 0); echo \"[#auto-tee] saved:$temp_file size:\$(( \$TEMP_SIZE / 1048576 ))MB cleanup:off\" >&2; if [[ -f \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" ]]; then source \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" && inject_capture_end_marker \"$temp_file\" 2>/dev/null || true; fi; } || { echo \"[#auto-tee] failed:$temp_file preserved:yes\" >&2; if [[ -f \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" ]]; then source \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" && inject_capture_end_marker \"$temp_file\" 2>/dev/null || true; fi; }"
         if [[ "$CLEANUP_ON_SUCCESS" != "true" ]]; then
             log_verbose "Cleanup disabled via CLAUDE_AUTO_TEE_CLEANUP_ON_SUCCESS=$CLEANUP_ON_SUCCESS"
         else

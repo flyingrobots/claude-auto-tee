@@ -86,7 +86,20 @@ predict_capture_path() {
     fi
     
     # Use the same timestamp-based path generation as claude-auto-tee.sh
-    local predicted_path="${temp_dir}/${temp_file_prefix}-$(date +%s%N | cut -b1-13).log"
+    # Cross-platform timestamp generation for unique file names
+    local timestamp
+    if command -v gdate >/dev/null 2>&1; then
+        # Use GNU date if available (installed via homebrew on macOS)
+        timestamp=$(gdate +%s%N | cut -b1-13)
+    elif date +%s%3N >/dev/null 2>&1; then
+        # Some systems support milliseconds directly
+        timestamp=$(date +%s%3N)
+    else
+        # Fallback: seconds + random padding for uniqueness
+        # This matches what the main script would generate on macOS
+        timestamp="$(date +%s)$(printf "%03d" $((RANDOM % 1000)))"
+    fi
+    local predicted_path="${temp_dir}/${temp_file_prefix}-${timestamp}.log"
     
     # Normalize path for consistency
     if command -v normalize_path >/dev/null 2>&1; then
