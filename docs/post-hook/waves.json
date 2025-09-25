@@ -1,0 +1,85 @@
+{
+  "planId": "PLAN-b2c3d4e5",
+  "generated": {
+    "by": "T.A.S.K.S v1",
+    "timestamp": "2025-01-13T00:00:00Z",
+    "contentHash": "d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2"
+  },
+  "config": {
+    "maxWaveSize": 30,
+    "barrier": {
+      "kind": "quorum",
+      "quorum": 0.95
+    }
+  },
+  "waves": [
+    {
+      "waveNumber": 1,
+      "tasks": ["P1.T001", "P1.T002", "P1.T004", "P1.T005", "P2.T001", "P2.T006", "P3.T001", "P3.T003", "P3.T005"],
+      "estimates": {
+        "units": "hours",
+        "p50Hours": 5.0,
+        "p80Hours": 6.7,
+        "p95Hours": 8.8
+      },
+      "barrier": {
+        "kind": "quorum",
+        "quorum": 0.95,
+        "timeoutMinutes": 480,
+        "fallback": "deferOptional",
+        "gateId": "W1→W2-q95"
+      }
+    },
+    {
+      "waveNumber": 2,
+      "tasks": ["P1.T003", "P1.T006", "P2.T002", "P2.T003", "P2.T004", "P3.T002"],
+      "estimates": {
+        "units": "hours",
+        "p50Hours": 6.0,
+        "p80Hours": 7.0,
+        "p95Hours": 8.3
+      },
+      "barrier": {
+        "kind": "quorum",
+        "quorum": 0.95,
+        "timeoutMinutes": 480,
+        "fallback": "deferOptional",
+        "gateId": "W2→W3-q95"
+      }
+    },
+    {
+      "waveNumber": 3,
+      "tasks": ["P1.T007", "P3.T006"],
+      "estimates": {
+        "units": "hours",
+        "p50Hours": 5.0,
+        "p80Hours": 6.3,
+        "p95Hours": 8.0
+      },
+      "barrier": {
+        "kind": "quorum",
+        "quorum": 0.95,
+        "timeoutMinutes": 300,
+        "fallback": "deferOptional",
+        "gateId": "W3→W4-q95"
+      }
+    },
+    {
+      "waveNumber": 4,
+      "tasks": ["P2.T005", "P3.T004"],
+      "estimates": {
+        "units": "hours",
+        "p50Hours": 5.0,
+        "p80Hours": 5.8,
+        "p95Hours": 7.0
+      },
+      "barrier": {
+        "kind": "full",
+        "quorum": 1.0,
+        "timeoutMinutes": 420,
+        "fallback": "halt",
+        "gateId": "W4-final"
+      }
+    }
+  ]
+}

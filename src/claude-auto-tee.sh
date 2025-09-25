@@ -9,6 +9,8 @@ IFS=$'\n\t'
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/error-codes.sh"
 source "${SCRIPT_DIR}/disk-space-check.sh"
+source "${SCRIPT_DIR}/path-utils.sh"
+source "${SCRIPT_DIR}/markers/pretooluse-markers.sh"
 
 # Environment variable overrides (P1.T003)
 readonly VERBOSE_MODE="${CLAUDE_AUTO_TEE_VERBOSE:-false}"
@@ -18,9 +20,25 @@ readonly TEMP_FILE_PREFIX="${CLAUDE_AUTO_TEE_TEMP_PREFIX:-claude}"
 readonly DEFAULT_MAX_TEMP_FILE_SIZE=104857600
 readonly MAX_TEMP_FILE_SIZE="${CLAUDE_AUTO_TEE_MAX_SIZE:-$DEFAULT_MAX_TEMP_FILE_SIZE}"
 
+# Dry-run mode
+readonly DRY_RUN_MODE="${CLAUDE_AUTO_TEE_DRY_RUN:-false}"
+
+# Multi-pipe support (opt-in)
+readonly ALLOW_MULTI_PIPE="${CLAUDE_AUTO_TEE_ALLOW_MULTI:-false}"
+
+# Deny/allow lists (comma-separated)
+readonly DENYLIST="${CLAUDE_AUTO_TEE_DENYLIST:-}"
+readonly ALLOWLIST="${CLAUDE_AUTO_TEE_ALLOWLIST:-}"
+
 # Age-based cleanup configuration (P1.T015)
 readonly CLEANUP_AGE_HOURS="${CLAUDE_AUTO_TEE_CLEANUP_AGE_HOURS:-48}"   # Default: 48 hours
 readonly ENABLE_AGE_CLEANUP="${CLAUDE_AUTO_TEE_ENABLE_AGE_CLEANUP:-true}"
+
+# Resource usage warning configuration (P1.T022)
+readonly ENABLE_RESOURCE_WARNINGS="${CLAUDE_AUTO_TEE_ENABLE_RESOURCE_WARNINGS:-true}"
+readonly SPACE_WARNING_THRESHOLD_MB="${CLAUDE_AUTO_TEE_SPACE_WARNING_THRESHOLD_MB:-500}" # Warn if less than 500MB
+readonly TEMP_FILE_WARNING_SIZE_MB="${CLAUDE_AUTO_TEE_TEMP_FILE_WARNING_SIZE_MB:-50}"     # Warn if temp file > 50MB
+readonly MAX_TEMP_FILES_WARNING="${CLAUDE_AUTO_TEE_MAX_TEMP_FILES_WARNING:-20}"           # Warn if > 20 temp files
 
 # Verbose logging function
 log_verbose() {
@@ -32,6 +50,75 @@ log_verbose() {
 # Check if verbose mode is enabled (for error reporting)
 is_verbose_mode() {
     [[ "$VERBOSE_MODE" == "true" ]]
+}
+
+# Resource usage warning functions (P1.T022)
+log_resource_warning() {
+    if [[ "$ENABLE_RESOURCE_WARNINGS" == "true" ]]; then
+        echo "[CLAUDE-AUTO-TEE] ⚠️  RESOURCE WARNING: $1" >&2
+    fi
+}
+
+check_disk_space_warnings() {
+    local temp_dir="$1"
+    
+    if [[ "$ENABLE_RESOURCE_WARNINGS" != "true" ]]; then
+        return 0
+    fi
+    
+    # Get available space in MB with timeout protection
+    local available_mb
+    if available_mb=$(timeout 5 check_disk_space "$temp_dir" 2>/dev/null); then
+        # Remove 'MB' suffix if present
+        available_mb="${available_mb%MB}"
+        
+        # Check if space is below warning threshold
+        if [[ "$available_mb" =~ ^[0-9]+$ ]] && [[ "$available_mb" -lt "$SPACE_WARNING_THRESHOLD_MB" ]]; then
+            log_resource_warning "Low disk space in temp directory: ${available_mb}MB available (threshold: ${SPACE_WARNING_THRESHOLD_MB}MB)"
+            log_resource_warning "Consider cleaning up temp files or using CLAUDE_AUTO_TEE_TEMP_DIR to specify alternative location"
+        fi
+    fi
+}
+
+check_temp_file_count_warnings() {
+    local temp_dir="$1"
+    
+    if [[ "$ENABLE_RESOURCE_WARNINGS" != "true" ]] || [[ ! -d "$temp_dir" ]]; then
+        return 0
+    fi
+    
+    # Count existing claude temp files with timeout and depth protection
+    local temp_file_count
+    if temp_file_count=$(timeout 3 find "$temp_dir" -maxdepth 1 -name "${TEMP_FILE_PREFIX}-*" -type f 2>/dev/null | wc -l 2>/dev/null); then
+        temp_file_count="${temp_file_count// /}" # Remove whitespace
+        
+        if [[ "$temp_file_count" =~ ^[0-9]+$ ]] && [[ "$temp_file_count" -gt "$MAX_TEMP_FILES_WARNING" ]]; then
+            log_resource_warning "High number of temp files detected: $temp_file_count files (threshold: $MAX_TEMP_FILES_WARNING)"
+            log_resource_warning "Consider enabling cleanup: export CLAUDE_AUTO_TEE_CLEANUP_ON_SUCCESS=true"
+            if [[ "$temp_file_count" -gt $((MAX_TEMP_FILES_WARNING * 2)) ]]; then
+                log_resource_warning "Very high temp file count! You may want to clean up manually: rm -f ${temp_dir}/${TEMP_FILE_PREFIX}-*"
+            fi
+        fi
+    else
+        # Fallback: skip the check if find takes too long
+        log_verbose "Temp file count check skipped (directory scan timeout)"
+    fi
+}
+
+monitor_resource_usage() {
+    local temp_dir="$1"
+    
+    if [[ "$ENABLE_RESOURCE_WARNINGS" != "true" ]]; then
+        return 0
+    fi
+    
+    log_verbose "Monitoring resource usage (warnings enabled)"
+    
+    # Check disk space warnings (with timeout protection)
+    check_disk_space_warnings "$temp_dir"
+    
+    # Check temp file count warnings (with timeout protection)
+    check_temp_file_count_warnings "$temp_dir"
 }
 
 # Create cleanup function script (P1.T013)
@@ -63,6 +150,7 @@ EOF
 
 # Initial verbose mode detection
 log_verbose "Verbose mode enabled (CLAUDE_AUTO_TEE_VERBOSE=$VERBOSE_MODE)"
+log_verbose "Resource usage warnings: $ENABLE_RESOURCE_WARNINGS (disk space threshold: ${SPACE_WARNING_THRESHOLD_MB}MB, file size threshold: ${TEMP_FILE_WARNING_SIZE_MB}MB)"
 
 # Global variables for cleanup on interruption (P1.T014)
 CURRENT_TEMP_FILE=""
@@ -147,6 +235,7 @@ cleanup_orphaned_files() {
     
     # Use find if available, otherwise fall back to ls-based approach
     if command -v find >/dev/null 2>&1; then
+        log_verbose "Using find to locate orphaned files in: $temp_dir"
         # Find files matching our pattern that are older than cutoff time
         while IFS= read -r -d '' file; do
             if [[ -f "$file" ]]; then
@@ -180,7 +269,7 @@ cleanup_orphaned_files() {
                     log_verbose "File appears to be in use, skipping: $file"
                 fi
             fi
-        done < <(find "$temp_dir" -name "${TEMP_FILE_PREFIX}-*" -type f -print0 2>/dev/null || true)
+        done < <(timeout 10 find "$temp_dir" -maxdepth 2 -name "${TEMP_FILE_PREFIX}-*" -type f -print0 2>/dev/null || true)
     else
         # Fallback for systems without find
         log_verbose "find command not available, using fallback cleanup method"
@@ -309,7 +398,8 @@ run_startup_cleanup() {
     # Add environment variable temp directories
     for env_temp_dir in "${TMPDIR:-}" "${TMP:-}" "${TEMP:-}" "${CLAUDE_AUTO_TEE_TEMP_DIR:-}"; do
         if [[ -n "$env_temp_dir" ]] && [[ -d "$env_temp_dir" ]]; then
-            local clean_dir="${env_temp_dir%/}"  # Remove trailing slash
+            local clean_dir
+            clean_dir=$(normalize_path "$env_temp_dir")
             # Check if not already in list
             local already_added=false
             for existing_dir in "${temp_dirs_to_clean[@]}"; do
@@ -340,7 +430,12 @@ run_startup_cleanup() {
 }
 
 # Run startup cleanup during initialization (P1.T015)
-run_startup_cleanup
+# Only run if explicitly enabled to avoid startup delays
+if [[ "$ENABLE_AGE_CLEANUP" == "true" ]]; then
+    timeout 30 run_startup_cleanup 2>/dev/null || {
+        log_verbose "Startup cleanup timed out or failed - continuing without cleanup"
+    }
+fi
 
 # Enhanced environment detection functions (P1.T004)
 detect_container_environment() {
@@ -465,7 +560,7 @@ get_temp_dir() {
     # Test candidates in priority order
     # 1. Claude Auto-Tee specific override (P1.T003)
     if [[ -n "${CLAUDE_AUTO_TEE_TEMP_DIR:-}" ]]; then
-        dir="${CLAUDE_AUTO_TEE_TEMP_DIR%/}"  # Remove trailing slash
+        dir=$(normalize_path "${CLAUDE_AUTO_TEE_TEMP_DIR}")
         log_verbose "Testing CLAUDE_AUTO_TEE_TEMP_DIR override: $dir"
         
         # Try to create directory if it doesn't exist
@@ -489,7 +584,7 @@ get_temp_dir() {
     
     # 2. Standard environment variables (cross-platform)
     if [[ -n "${TMPDIR:-}" ]]; then
-        dir="${TMPDIR%/}"  # Remove trailing slash
+        dir=$(normalize_path "${TMPDIR}")
         log_verbose "Testing TMPDIR: $dir"
         if test_temp_directory_suitability "$dir" "TMPDIR"; then
             log_verbose "Using TMPDIR: $dir"
@@ -500,7 +595,7 @@ get_temp_dir() {
     fi
     
     if [[ -n "${TMP:-}" ]]; then
-        dir="${TMP%/}"
+        dir=$(normalize_path "${TMP}")
         log_verbose "Testing TMP: $dir"
         if test_temp_directory_suitability "$dir" "TMP"; then
             log_verbose "Using TMP: $dir"
@@ -511,7 +606,7 @@ get_temp_dir() {
     fi
     
     if [[ -n "${TEMP:-}" ]]; then
-        dir="${TEMP%/}"
+        dir=$(normalize_path "${TEMP}")
         log_verbose "Testing TEMP: $dir"
         if test_temp_directory_suitability "$dir" "TEMP"; then
             log_verbose "Using TEMP: $dir"
@@ -645,38 +740,285 @@ if [[ -z "$input" ]]; then
     report_error $ERR_INVALID_INPUT "Empty input received" true
 fi
 
-# Extract command from JSON (handle escaped quotes)
+# Extract command from JSON (hardened with jq fallback)
 set_error_context "Parsing JSON input"
-command_escaped=$(echo "$input" | sed -n 's/.*"command":"\([^"]*\(\\"[^"]*\)*\)".*/\1/p' | tr -d '\n')
-if [[ -z "$command_escaped" ]]; then
-    log_verbose "No command found in JSON, checking for malformed JSON"
-    if ! echo "$input" | grep -q '"tool"'; then
-        log_verbose "Input does not appear to be valid tool JSON - passing through unchanged"
-        report_warning $ERR_MALFORMED_JSON "Malformed JSON input - graceful passthrough"
+
+# Try jq first for robust JSON parsing
+if command -v jq >/dev/null 2>&1; then
+    command=$(echo "$input" | jq -r '.tool.input.command // empty' 2>/dev/null)
+    if [[ -n "$command" ]]; then
+        log_verbose "Command extracted using jq: $command"
+    else
+        # jq didn't find command, check if it's valid JSON
+        if ! echo "$input" | jq . >/dev/null 2>&1; then
+            log_verbose "Input is not valid JSON - passing through unchanged"
+            report_warning $ERR_MALFORMED_JSON "Malformed JSON input - graceful passthrough"
+            echo "$input"
+            exit 0
+        fi
+        # Valid JSON but no bash command
         echo "$input"
         exit 0
     fi
-    # Not a bash command, pass through unchanged
-    echo "$input"
-    exit 0
+else
+    # Fallback to sed parsing (existing logic)
+    log_verbose "jq not available, using sed fallback for JSON parsing"
+    command_escaped=$(echo "$input" | sed -n 's/.*"command":"\([^"]*\(\\"[^"]*\)*\)".*/\1/p' | tr -d '\n')
+    if [[ -z "$command_escaped" ]]; then
+        log_verbose "No command found in JSON, checking for malformed JSON"
+        if ! echo "$input" | grep -q '"tool"'; then
+            log_verbose "Input does not appear to be valid tool JSON - passing through unchanged"
+            report_warning $ERR_MALFORMED_JSON "Malformed JSON input - graceful passthrough"
+            echo "$input"
+            exit 0
+        fi
+        # Not a bash command, pass through unchanged
+        echo "$input"
+        exit 0
+    fi
+    command=$(echo "$command_escaped" | sed 's/\\"/"/g')
 fi
-
-command=$(echo "$command_escaped" | sed 's/\\"/"/g')
 if [[ -z "$command" ]]; then
     report_error $ERR_MISSING_COMMAND "Command field is empty" true
 fi
 
 clear_error_context
 
-# Check if command contains pipe and doesn't already have tee  
-if echo "$command" | grep -q " | "; then
+# Security validation and safe pipe detection
+validate_command_security() {
+    local cmd="$1"
+    
+    # 1. Syntax validation using bash parser
+    if ! bash -n <<< "$cmd" 2>/dev/null; then
+        log_verbose "Command failed syntax validation"
+        return 1
+    fi
+    
+    # 2. Security checks - reject dangerous patterns
+    # Allow 2>&1 and 1>&2 redirections but block dangerous operators
+    # First remove safe redirections, then check for dangerous patterns
+    local safe_cmd
+    safe_cmd=$(echo "$cmd" | sed 's/[12]>&[12]//g')
+    if echo "$safe_cmd" | grep -qE '&|;|\$\(|\`|\\|&&|\|\|'; then
+        log_verbose "Command contains potentially dangerous operators or expansions"
+        return 1
+    fi
+    
+    # 3. Length check
+    if [[ "${#cmd}" -gt 500 ]]; then
+        log_verbose "Command too long (>${#cmd} chars)"
+        return 1
+    fi
+    
+    # 4. Quote balance check
+    local single_quotes double_quotes
+    single_quotes=$(echo "$cmd" | grep -o "'" | wc -l)
+    double_quotes=$(echo "$cmd" | grep -o '"' | wc -l)
+    if [[ $((single_quotes % 2)) -ne 0 ]] || [[ $((double_quotes % 2)) -ne 0 ]]; then
+        log_verbose "Unbalanced quotes detected"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Safe pipe detection that respects quotes
+detect_safe_pipes() {
+    local cmd="$1"
+    local in_single_quote=false
+    local in_double_quote=false
+    local escaped=false
+    local pipe_positions=()
+    local i=0
+    
+    while [[ $i -lt ${#cmd} ]]; do
+        local char="${cmd:$i:1}"
+        local next_char="${cmd:$((i+1)):1}"
+        local prev_char="${cmd:$((i-1)):1}"
+        
+        if [[ "$escaped" == "true" ]]; then
+            escaped=false
+            ((i++))
+            continue
+        fi
+        
+        case "$char" in
+            '\\')
+                escaped=true
+                ;;
+            "'")
+                if [[ "$in_double_quote" == "false" ]]; then
+                    in_single_quote=$([[ "$in_single_quote" == "true" ]] && echo "false" || echo "true")
+                fi
+                ;;
+            '"')
+                if [[ "$in_single_quote" == "false" ]]; then
+                    in_double_quote=$([[ "$in_double_quote" == "true" ]] && echo "false" || echo "true")
+                fi
+                ;;
+            '|')
+                if [[ "$in_single_quote" == "false" ]] && [[ "$in_double_quote" == "false" ]]; then
+                    # Check for proper pipe with spaces
+                    if [[ "$prev_char" == " " ]] && [[ "$next_char" == " " ]]; then
+                        pipe_positions+=($i)
+                    fi
+                fi
+                ;;
+        esac
+        
+        ((i++))
+    done
+    
+    echo "${#pipe_positions[@]}"
+    return 0
+}
+
+# Get position of first safe pipe
+detect_first_pipe_position() {
+    local cmd="$1"
+    local in_single_quote=false
+    local in_double_quote=false
+    local escaped=false
+    local i=0
+    
+    while [[ $i -lt ${#cmd} ]]; do
+        local char="${cmd:$i:1}"
+        local next_char="${cmd:$((i+1)):1}"
+        local prev_char="${cmd:$((i-1)):1}"
+        
+        if [[ "$escaped" == "true" ]]; then
+            escaped=false
+            ((i++))
+            continue
+        fi
+        
+        case "$char" in
+            '\\')
+                escaped=true
+                ;;
+            "'")
+                if [[ "$in_double_quote" == "false" ]]; then
+                    in_single_quote=$([[ "$in_single_quote" == "true" ]] && echo "false" || echo "true")
+                fi
+                ;;
+            '"')
+                if [[ "$in_single_quote" == "false" ]]; then
+                    in_double_quote=$([[ "$in_double_quote" == "true" ]] && echo "false" || echo "true")
+                fi
+                ;;
+            '|')
+                if [[ "$in_single_quote" == "false" ]] && [[ "$in_double_quote" == "false" ]]; then
+                    # Check for proper pipe with spaces
+                    if [[ "$prev_char" == " " ]] && [[ "$next_char" == " " ]]; then
+                        echo "$i"
+                        return 0
+                    fi
+                fi
+                ;;
+        esac
+        
+        ((i++))
+    done
+    
+    echo "-1"
+    return 0
+}
+
+# Check deny/allow lists
+check_deny_allow_lists() {
+    local cmd="$1"
+    
+    # Extract first command for deny/allow checking
+    local first_cmd
+    first_cmd=$(echo "$cmd" | awk '{print $1}')
+    
+    # Check denylist
+    if [[ -n "$DENYLIST" ]]; then
+        IFS=',' read -ra DENY_ARRAY <<< "$DENYLIST"
+        for denied in "${DENY_ARRAY[@]}"; do
+            denied=$(echo "$denied" | tr -d ' ')
+            if [[ "$first_cmd" == "$denied" ]]; then
+                echo "[#auto-tee] pass-through: command in denylist" >&2
+                log_verbose "Command '$first_cmd' is in denylist - passing through unchanged"
+                return 1
+            fi
+        done
+    fi
+    
+    # Check allowlist (if specified, only allow listed commands)
+    if [[ -n "$ALLOWLIST" ]]; then
+        IFS=',' read -ra ALLOW_ARRAY <<< "$ALLOWLIST"
+        local allowed=false
+        for allow in "${ALLOW_ARRAY[@]}"; do
+            allow=$(echo "$allow" | tr -d ' ')
+            if [[ "$first_cmd" == "$allow" ]]; then
+                allowed=true
+                break
+            fi
+        done
+        if [[ "$allowed" == "false" ]]; then
+            echo "[#auto-tee] pass-through: command not in allowlist" >&2
+            log_verbose "Command '$first_cmd' is not in allowlist - passing through unchanged"
+            return 1
+        fi
+    fi
+    
+    return 0
+}
+
+# Dry-run mode check
+if [[ "$DRY_RUN_MODE" == "true" ]]; then
+    echo "[#auto-tee] DRY-RUN MODE" >&2
+    echo "[#auto-tee] Would process command: $command" >&2
+    temp_dir=$(get_temp_dir 2>/dev/null || echo "/tmp")
+    echo "[#auto-tee] Would use temp dir: $temp_dir" >&2
+    echo "[#auto-tee] Would create temp file: ${temp_dir}/${TEMP_FILE_PREFIX}-$(date +%s).log" >&2
+    echo "$input"
+    exit 0
+fi
+
+# Check if command contains pipe and doesn't already have tee
+log_verbose "Validating command security: $command"
+if ! validate_command_security "$command"; then
+    echo "[#auto-tee] pass-through: security check failed" >&2
+    log_verbose "Command failed security validation - passing through unchanged"
+    echo "$input"
+    exit 0
+fi
+
+# Check deny/allow lists
+if ! check_deny_allow_lists "$command"; then
+    echo "$input"
+    exit 0
+fi
+
+pipe_count=$(detect_safe_pipes "$command")
+if [[ "$pipe_count" -gt 0 ]]; then
     if echo "$command" | grep -q "tee "; then
         # Skip - already has tee
+        log_verbose "Command already contains tee - passing through unchanged"
         echo "$input"
         exit 0
     fi
-    # Process - has pipe but no tee
-    log_verbose "Pipe command detected: $command"
+    
+    # Additional check: handle multi-pipe if explicitly allowed
+    if [[ "$pipe_count" -ne 1 ]]; then
+        if [[ "$ALLOW_MULTI_PIPE" != "true" ]]; then
+            log_verbose "Multiple pipes detected ($pipe_count) - passing through unchanged (set CLAUDE_AUTO_TEE_ALLOW_MULTI=true to enable)"
+            echo "$input"
+            exit 0
+        else
+            log_verbose "Multiple pipes detected ($pipe_count) - processing with multi-pipe support"
+            # Note: Multi-pipe implementation would go here in future
+            # For now, still pass through as it's not fully implemented
+            log_verbose "Multi-pipe support not yet fully implemented - passing through"
+            echo "$input"
+            exit 0
+        fi
+    fi
+    
+    # Process - has single pipe but no tee
+    log_verbose "Safe single pipe command detected: $command"
     
     # Get suitable temp directory with error context
     set_error_context "Detecting suitable temp directory"
@@ -693,6 +1035,12 @@ if echo "$command" | grep -q " | "; then
     fi
     clear_error_context
     log_verbose "Selected temp directory: $temp_dir"
+    
+    # Inject PreToolUse marker early (before temp file creation) - P2.T001
+    log_verbose "Injecting PreToolUse capture marker (before temp file creation)"
+    inject_pretooluse_marker "$command" "$temp_dir" "$TEMP_FILE_PREFIX" || {
+        log_verbose "Warning: Failed to inject PreToolUse marker - continuing without early marker"
+    }
     
     # Check disk space before proceeding (P1.T017, P1.T019)
     set_error_context "Checking disk space for command execution"
@@ -741,9 +1089,25 @@ if echo "$command" | grep -q " | "; then
         MAX_TEMP_FILE_SIZE="$DEFAULT_MAX_TEMP_FILE_SIZE"
     fi
     
-    # Generate unique temp file and cleanup script (P1.T013)
+    # Generate unique temp file and cleanup script (P1.T013, P1.T007)
     set_error_context "Creating temp file and cleanup script"
-    temp_file="${temp_dir}/${TEMP_FILE_PREFIX}-$(date +%s%N | cut -b1-13).log"
+    
+    # Use path utilities for robust cross-platform path handling
+    if ! temp_file=$(create_safe_temp_path "$temp_dir" "$TEMP_FILE_PREFIX" ".log"); then
+        log_verbose "Failed to create safe temp path, falling back to basic method"
+        # Fallback: POSIX timestamp + hash
+        timestamp=$(date +%s)
+        unique_string="${timestamp}-$$-${RANDOM:-0}"
+        if command -v md5sum >/dev/null 2>&1; then
+            hash_suffix=$(echo "$unique_string" | md5sum | cut -c1-6)
+        elif command -v md5 >/dev/null 2>&1; then
+            hash_suffix=$(echo "$unique_string" | md5 | cut -c1-6)
+        else
+            hash_suffix="$$$(date +%S)"
+        fi
+        temp_file="${temp_dir}/${TEMP_FILE_PREFIX}-${timestamp}${hash_suffix}.log"
+        temp_file=$(normalize_path "$temp_file")
+    fi
     
     # Set global variables for interruption cleanup (P1.T014)
     CURRENT_TEMP_FILE="$temp_file"
@@ -765,38 +1129,58 @@ if echo "$command" | grep -q " | "; then
     
     log_verbose "Generated temp file: $temp_file"
     log_verbose "Generated cleanup script: $cleanup_script"
+    
+    # Legacy marker injection for PostToolUse hook compatibility (P2.T001)
+    # Note: PreToolUse marker was already injected earlier with predicted path
+    log_verbose "Injecting additional capture start marker for PostToolUse hook (legacy compatibility)"
+    inject_capture_start_marker "$temp_file" || {
+        log_verbose "Warning: Failed to inject legacy capture start marker - continuing without additional markers"
+    }
+    
+    # Monitor resource usage and provide warnings (P1.T022)
+    monitor_resource_usage "$temp_dir"
+    
     clear_error_context
     
-    # Find first pipe and split command
-    before_pipe="${command%% | *}"
-    after_pipe="${command#* | }"
+    # Find first pipe and split command using quote-aware detection
+    pipe_position=$(detect_first_pipe_position "$command")
+    if [[ "$pipe_position" -eq -1 ]]; then
+        log_verbose "No valid pipe found after security validation - passing through unchanged"
+        echo "$input"
+        exit 0
+    fi
+    
+    # Extract parts around the pipe (pipe_position points to |, we want to exclude " | ")
+    before_pipe="${command:0:$((pipe_position-1))}"  # Up to space before |
+    after_pipe="${command:$((pipe_position+2))}"     # After | and space
     log_verbose "Split command - before pipe: $before_pipe"
     log_verbose "Split command - after pipe: $after_pipe"
     
     # Construct modified command with tee, size limits, and cleanup (P1.T013, P1.T018)
+    # FIXED: tee should capture full output, size limiting only applies to downstream pipeline
     # Only add 2>&1 if not already present
     if echo "$before_pipe" | grep -q "2>&1"; then
-        base_tee_command="$before_pipe | head -c $MAX_TEMP_FILE_SIZE | tee \"$temp_file\""
-        log_verbose "Command already has 2>&1, tee with size limit: $base_tee_command"
+        base_tee_command="$before_pipe | tee \"$temp_file\" | head -c $MAX_TEMP_FILE_SIZE"
+        log_verbose "Command already has 2>&1, tee captures full output, size limit applied to pipeline: $base_tee_command"
     else
-        base_tee_command="$before_pipe 2>&1 | head -c $MAX_TEMP_FILE_SIZE | tee \"$temp_file\""
-        log_verbose "Added 2>&1 and tee with size limit: $base_tee_command"
+        base_tee_command="$before_pipe 2>&1 | tee \"$temp_file\" | head -c $MAX_TEMP_FILE_SIZE"
+        log_verbose "Added 2>&1, tee captures full output, size limit applied to pipeline: $base_tee_command"
     fi
     
-    # Add size warning when truncation occurs
-    modified_command="{ $base_tee_command; SIZE_CHECK=\$(wc -c < \"$temp_file\" 2>/dev/null || echo 0); if [[ \$SIZE_CHECK -ge $MAX_TEMP_FILE_SIZE ]]; then echo \"[CLAUDE-AUTO-TEE] WARNING: Output truncated at $((MAX_TEMP_FILE_SIZE / 1024 / 1024))MB limit\" >&2; fi; } | $after_pipe"
-    log_verbose "Added size monitoring and truncation warning: $modified_command"
+    # Add size warning when pipeline truncation occurs (temp file may still contain full output)
+    modified_command="{ $base_tee_command; PIPELINE_SIZE=\$?; TEMP_SIZE=\$(wc -c < \"$temp_file\" 2>/dev/null || echo 0); if [[ \$TEMP_SIZE -gt $MAX_TEMP_FILE_SIZE ]]; then echo \"[#auto-tee] truncated:yes full_size:\$(( \$TEMP_SIZE / 1048576 ))MB limit:$((MAX_TEMP_FILE_SIZE / 1048576))MB\" >&2; fi; } | $after_pipe"
+    log_verbose "Pipeline receives size-limited data, temp file contains full output: $modified_command"
     
     # Add cleanup on successful completion (P1.T013)
     # Use CLEANUP_ON_SUCCESS environment variable override (P1.T003)
     final_command="$modified_command"
     
     if [[ "$CLEANUP_ON_SUCCESS" == "true" ]] && [[ -n "$cleanup_script" ]] && [[ -f "$cleanup_script" ]]; then
-        cleanup_command="source \"$cleanup_script\" && { $final_command; } && { echo \"Full output saved to: $temp_file\"; cleanup_temp_file \"$temp_file\"; rm -f \"$cleanup_script\" 2>/dev/null || true; } || { echo \"Command failed - temp file preserved: $temp_file\"; rm -f \"$cleanup_script\" 2>/dev/null || true; }"
-        log_verbose "Added cleanup logic for successful completion (CLEANUP_ON_SUCCESS=$CLEANUP_ON_SUCCESS)"
+        cleanup_command="source \"$cleanup_script\" && { $final_command; } && { TEMP_SIZE=\$(wc -c < \"$temp_file\" 2>/dev/null || echo 0); echo \"[#auto-tee] saved:$temp_file size:\$(( \$TEMP_SIZE / 1048576 ))MB cleanup:on\" >&2; if [[ -f \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" ]]; then source \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" && inject_capture_end_marker \"$temp_file\" 2>/dev/null || true; fi; cleanup_temp_file \"$temp_file\"; rm -f \"$cleanup_script\" 2>/dev/null || true; } || { echo \"[#auto-tee] failed:$temp_file preserved:yes\" >&2; if [[ -f \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" ]]; then source \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" && inject_capture_end_marker \"$temp_file\" 2>/dev/null || true; fi; rm -f \"$cleanup_script\" 2>/dev/null || true; }"
+        log_verbose "Added cleanup logic with end markers for successful completion (CLEANUP_ON_SUCCESS=$CLEANUP_ON_SUCCESS)"
     else
         # No cleanup or cleanup disabled - preserve temp file
-        cleanup_command="{ $final_command; } && echo \"Full output saved to: $temp_file\" || echo \"Command failed - temp file preserved: $temp_file\""
+        cleanup_command="{ $final_command; } && { TEMP_SIZE=\$(wc -c < \"$temp_file\" 2>/dev/null || echo 0); echo \"[#auto-tee] saved:$temp_file size:\$(( \$TEMP_SIZE / 1048576 ))MB cleanup:off\" >&2; if [[ -f \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" ]]; then source \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" && inject_capture_end_marker \"$temp_file\" 2>/dev/null || true; fi; } || { echo \"[#auto-tee] failed:$temp_file preserved:yes\" >&2; if [[ -f \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" ]]; then source \"${SCRIPT_DIR}/markers/pretooluse-markers.sh\" && inject_capture_end_marker \"$temp_file\" 2>/dev/null || true; fi; }"
         if [[ "$CLEANUP_ON_SUCCESS" != "true" ]]; then
             log_verbose "Cleanup disabled via CLAUDE_AUTO_TEE_CLEANUP_ON_SUCCESS=$CLEANUP_ON_SUCCESS"
         else

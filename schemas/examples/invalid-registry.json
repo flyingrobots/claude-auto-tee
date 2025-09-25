@@ -1,0 +1,51 @@
+{
+  "version": "not-a-semver",
+  "lastModified": "invalid-date-format",
+  "totalCaptures": -1,
+  "captures": [
+    {
+      "path": "",
+      "command": "",
+      "timestamp": "2025-01-13T15:30:45.123Z",
+      "size": -100,
+      "hash": "invalid-hash-too-short",
+      "toolName": "",
+      "toolVersion": "not-a-version",
+      "exitCode": "not-a-number",
+      "duration": -5,
+      "workingDirectory": "relative/path/not-allowed",
+      "environment": {
+        "key": 123
+      },
+      "tags": [
+        "invalid tag with spaces",
+        "invalid-tag-too-long-exceeding-fifty-character-limit-that-should-fail",
+        "duplicate",
+        "duplicate"
+      ],
+      "metadata": "should-be-object-not-string"
+    },
+    {
+      "path": "/valid/path/file.txt",
+      "timestamp": "2025-01-13T15:30:45.123Z",
+      "size": 1024,
+      "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "stats": {
+    "totalSize": "should-be-number",
+    "averageSize": -100,
+    "oldestCapture": "invalid-date",
+    "newestCapture": "2025-01-13T15:30:45.123Z",
+    "commandFrequency": "should-be-object"
+  },
+  "config": {
+    "maxCaptures": 0,
+    "maxFileSize": 512,
+    "retentionDays": 0,
+    "compressionEnabled": "not-boolean",
+    "autoCleanup": 1,
+    "invalidProperty": "should-not-be-allowed"
+  },
+  "invalidTopLevelProperty": "should-not-be-allowed"
+}
