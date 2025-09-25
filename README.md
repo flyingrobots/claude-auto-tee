@@ -1,4 +1,4 @@
-> [!INFO]
+> [!IMPORTANT]
 > **Status:** Invactive
 > As I was in the process of hardening this project, Claude Code released an update and I noticed Claude started doing this by default in many cases. So I've suspended work on this project. It works, but there's a lot of room for perfection. But, alas, I am not even a Claude user anymore, sadly. And so, this project is no longer actively worked on.
 > 🥀
